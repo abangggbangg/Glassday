@@ -26,6 +26,12 @@ Glassday is built as a SwiftUI shell around a hand-written HTML/CSS/JS interface
 - **Repeating tasks**: daily, weekdays or weekly.
 - **Overlap warnings** when you schedule over another task.
 
+### Phone-friendly task editor
+- **Starts → Ends** times. On iPhone these open the native time wheel; on a computer you can type.
+- **Duration wheel**: scroll hours and minutes like the iPhone Timer, with a light haptic tick on each step. Quick buttons cover the usual lengths (15 min to 2h).
+- Start, End and Duration stay in sync. Change any one and the others follow.
+- **Steady panel**: the title and Save button stay pinned while only the middle scrolls. The panel rises above the keyboard instead of pushing the screen, and you drag the top bar down to close it.
+
 <p align="center">
   <img src="docs/screenshots/calendar-views.png" alt="Week view, year view and inbox" width="100%">
   <br><sub>Week view · Year view · Inbox</sub>
@@ -86,6 +92,7 @@ Glassday is built as a SwiftUI shell around a hand-written HTML/CSS/JS interface
 Glassday/
 ├── project.yml                 # XcodeGen spec (targets, bundle IDs, Info.plist keys)
 ├── setup.sh                    # Installs XcodeGen if needed, generates and opens the project
+├── build-ipa.sh                # Builds Glassday.ipa (app + widget) for Sideloadly / AltStore
 ├── docs/screenshots/           # Images used in this README
 ├── App/
 │   ├── GlassdayApp.swift       # App entry point
@@ -186,7 +193,36 @@ open Glassday.xcodeproj
 7. Open Glassday and allow **Full Access** to Calendar.
 8. Add the widget: long-press the home screen, then **Edit → Add Widget → Glassday**.
 
-> **Free Apple ID:** apps signed with a free account expire after **7 days**. Re-run from Xcode to renew; your data stays. A paid Apple Developer Program membership extends this to one year.
+> **Free Apple ID:** apps signed with a free account expire after **7 days**. Re-run from Xcode to renew; your data stays. To renew automatically instead, use the free Sideloadly method below.
+
+### Free install with automatic renewal (Sideloadly)
+This keeps Apple Calendar sync and the widgets, costs nothing, and renews the app over Wi-Fi so you don't have to plug in every week.
+
+1. Build the app package:
+   ```bash
+   ./build-ipa.sh
+   ```
+   This creates `Glassday.ipa` with the app and widget inside.
+2. Install [Sideloadly](https://sideloadly.io) on your Mac. The first time, open it with right-click → **Open**.
+3. Plug in your iPhone, unlock it, and tap **Trust**. In Finder, select the iPhone, tick **Show this iPhone when on Wi-Fi**, and click **Apply**.
+4. In Sideloadly:
+   - drag in `Glassday.ipa`,
+   - enter your Apple ID,
+   - leave **Use automatic bundle ID** on and **Dropping 0 of 1 plug-ins** at 0 (that plug-in is the widget),
+   - turn on **automatic refresh** (the circular-arrows button),
+   - click **Start**.
+5. On the iPhone, go to **Settings → General → VPN & Device Management**, tap your Apple ID, and **Trust** it.
+6. Keep Sideloadly's helper running on the Mac (add it to **Login Items**). The app renews whenever the phone and Mac share Wi-Fi with the Mac awake, at least once every 7 days.
+
+**Free account limits**
+- **3 sideloaded apps** at once. Glassday and its widget use two of those slots.
+- **10 new App IDs every 7 days.** Updating or renewing Glassday reuses its App ID, so it doesn't count against this.
+
+**Updating:** run `./build-ipa.sh` again, drag the new `Glassday.ipa` into Sideloadly, and click **Start**. The app updates in place and keeps your data.
+
+**A second iPhone:** select it under *iDevice* in Sideloadly and install the same way. Each phone has its own 7-day timer. Inbox to-dos, icons and ticks stay on each phone, so move them with **Settings → Copy backup / Restore**.
+
+> **Security tip:** you can use a separate free Apple ID just for signing. Calendar sync uses the iCloud account signed in on the phone, so it isn't affected.
 
 ### Working on the UI
 The whole interface is in `App/Resources/index.html`. You can open it directly in a browser to iterate, then press **▶ Run** in Xcode to test it on the phone.
@@ -199,6 +235,9 @@ The whole interface is in `App/Resources/index.html`. You can open it directly i
 - [ ] Notifications before tasks start
 - [ ] Interactive widget checkboxes (iOS 17 App Intents)
 - [ ] Bundle fonts locally for full offline use
+- [x] Start/end times and a duration scroll wheel
+- [x] Steady task panel that works with the iPhone keyboard
+- [x] Free install with automatic renewal (Sideloadly)
 
 ---
 
