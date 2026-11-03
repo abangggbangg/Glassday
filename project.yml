@@ -27,7 +27,8 @@ targets:
       path: App/Info.plist
       properties:
         CFBundleDisplayName: Glassday
-        UILaunchScreen: {}
+        UILaunchScreen:
+          UIColorName: LaunchBackground
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
         NSCalendarsFullAccessUsageDescription: Glassday shows and edits your Apple Calendar events so your plans stay in sync.

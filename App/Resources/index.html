@@ -371,12 +371,49 @@ input[type=date].inp,input[type=time].inp{-webkit-appearance:none;appearance:non
 .fx{position:fixed;inset:0;pointer-events:none;z-index:60}
 .fx i{position:absolute;width:8px;height:8px;border-radius:3px}
 
+.splash{position:fixed;inset:0;z-index:100;display:grid;place-items:center;overflow:hidden;cursor:pointer;
+  background:radial-gradient(120% 80% at 50% 38%,#24221f 0%,#121214 55%,#08080a 100%);color:#f3efe7;
+  transition:opacity .55s ease,transform .7s cubic-bezier(.2,.8,.2,1),filter .55s ease}
+.splash::before{content:"";position:absolute;width:70vmax;height:70vmax;left:50%;top:40%;transform:translate(-50%,-50%) scale(.6);border-radius:50%;
+  background:radial-gradient(circle,rgba(210,176,122,.32),transparent 62%);filter:blur(20px);opacity:0;animation:spGlow 1.6s .1s ease forwards}
+.splash.out{opacity:0;transform:scale(1.08);filter:blur(8px);pointer-events:none}
+.sp-in{position:relative;display:flex;flex-direction:column;align-items:center;gap:26px}
+.sp-logo{position:relative;width:120px;height:132px;display:flex;flex-direction:column;align-items:center;gap:7px}
+.sp-rail{position:absolute;left:50%;top:6px;bottom:6px;width:4px;margin-left:-2px;border-radius:4px;background:rgba(255,255,255,.14);transform:scaleY(0);transform-origin:top;animation:spRail .5s .05s cubic-bezier(.2,.8,.2,1) forwards}
+.sp-pill{position:relative;width:38px;border-radius:20px;opacity:0;transform:translateY(-34px) scale(.6);
+  box-shadow:0 8px 20px rgba(0,0,0,.35),inset 0 2px 0 rgba(255,255,255,.35);animation:spDrop .62s cubic-bezier(.3,1.55,.5,1) forwards}
+.sp-pill:nth-of-type(2){height:38px;background:#F08A7E;animation-delay:.15s}
+.sp-pill:nth-of-type(3){height:56px;background:#5B7DB1;animation-delay:.3s}
+.sp-pill:nth-of-type(4){height:24px;background:#7BB662;animation-delay:.45s}
+.sp-now{position:absolute;left:4px;right:4px;top:66px;height:4px;border-radius:4px;background:#d2b07a;transform:scaleX(0);transform-origin:left;
+  box-shadow:0 0 14px rgba(210,176,122,.7);animation:spSweep .55s .8s cubic-bezier(.6,0,.2,1) forwards}
+.sp-now::before{content:"";position:absolute;left:-6px;top:-5px;width:14px;height:14px;border-radius:50%;background:#d2b07a}
+.sp-word{font-family:var(--f-display);font-weight:800;font-size:38px;letter-spacing:-.03em;display:flex}
+.sp-word span{display:inline-block;opacity:0;transform:translateY(18px);animation:spRise .5s cubic-bezier(.2,.9,.3,1.2) forwards;animation-delay:calc(1s + var(--i) * 45ms)}
+.sp-word span.g{color:#d2b07a}
+.sp-tag{font-size:13px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:rgba(243,239,231,.55);opacity:0;animation:spFade .5s 1.25s ease forwards;margin-top:-14px}
+@keyframes spGlow{to{opacity:1;transform:translate(-50%,-50%) scale(1)}}
+@keyframes spRail{to{transform:scaleY(1)}}
+@keyframes spDrop{to{opacity:1;transform:none}}
+@keyframes spSweep{to{transform:scaleX(1)}}
+@keyframes spRise{to{opacity:1;transform:none}}
+@keyframes spFade{to{opacity:1}}
+#app.entering,.dock.entering{animation:appIn .7s cubic-bezier(.2,.8,.2,1) both}
+.dock.entering{animation-delay:.12s}
+@keyframes appIn{from{opacity:0;transform:scale(.96) translateY(10px)}}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
 </style>
 </head>
 <body>
 
 
+<div class="splash" id="splash" aria-label="Glassday" role="img">
+  <div class="sp-in">
+    <div class="sp-logo"><span class="sp-rail"></span><span class="sp-pill"></span><span class="sp-pill"></span><span class="sp-pill"></span><span class="sp-now"></span></div>
+    <div class="sp-word"><span style="--i:0">G</span><span style="--i:1">l</span><span style="--i:2">a</span><span style="--i:3">s</span><span style="--i:4">s</span><span style="--i:5" class="g">d</span><span style="--i:6" class="g">a</span><span style="--i:7" class="g">y</span></div>
+    <div class="sp-tag">Plan your day, beautifully</div>
+  </div>
+</div>
 <div class="bg" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
 <div id="app">
   <header id="hdr"></header>
@@ -1177,6 +1214,15 @@ setInterval(()=>{ if(!sheet.classList.contains('open')&&(view==='timeline'||view
 document.addEventListener('visibilitychange',()=>{ if(!document.hidden&&!sheet.classList.contains('open')) render() });
 
 applyTheme(); render('fade'); setTimeout(scrollToNow,120);
+(()=>{ const sp=document.getElementById('splash'); if(!sp)return; let done=false;
+  const leave=()=>{ if(done)return; done=true; sp.classList.add('out');
+    const app=document.getElementById('app'), dock=document.querySelector('.dock');
+    [app,dock].forEach(x=>{x.classList.remove('entering');void x.offsetWidth;x.classList.add('entering')});
+    render('fade'); setTimeout(scrollToNow,120); buzz(6);
+    setTimeout(()=>{sp.remove();[app,dock].forEach(x=>x.classList.remove('entering'))},800) };
+  sp.addEventListener('click',leave);
+  setTimeout(leave, reduce?250:2300);
+})();
 if(NATIVE){post({type:'ready'}); post({type:'access'})}
 })();
 </script>

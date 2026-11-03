@@ -9,7 +9,7 @@ struct ContentView: View {
     var body: some View {
         WebView(webView: model.webView)
             .ignoresSafeArea()
-            .background(Color(uiColor: .systemBackground))
+            .background(Color("LaunchBackground"))
             .onOpenURL { model.open($0) }
             .onChange(of: scenePhase) { _, phase in
                 if phase == .active { model.bridge.appBecameActive() }
