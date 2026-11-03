@@ -1,0 +1,57 @@
+name: Glassday
+options:
+  bundleIdPrefix: com.geraldangya
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+
+settings:
+  base:
+    MARKETING_VERSION: "1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    SWIFT_VERSION: "5.0"
+    CODE_SIGN_STYLE: Automatic
+    TARGETED_DEVICE_FAMILY: "1"
+
+targets:
+  Glassday:
+    type: application
+    platform: iOS
+    sources:
+      - path: App
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.geraldangya.glassday
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+    info:
+      path: App/Info.plist
+      properties:
+        CFBundleDisplayName: Glassday
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        NSCalendarsFullAccessUsageDescription: Glassday shows and edits your Apple Calendar events so your plans stay in sync.
+        NSCalendarsUsageDescription: Glassday shows and edits your Apple Calendar events so your plans stay in sync.
+        CFBundleURLTypes:
+          - CFBundleURLName: com.geraldangya.glassday
+            CFBundleURLSchemes:
+              - glassday
+    dependencies:
+      - target: GlassdayWidget
+
+  GlassdayWidget:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: Widget
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.geraldangya.glassday.widget
+    info:
+      path: Widget/Info.plist
+      properties:
+        CFBundleDisplayName: Glassday
+        NSCalendarsFullAccessUsageDescription: The Glassday widget shows your Apple Calendar events.
+        NSCalendarsUsageDescription: The Glassday widget shows your Apple Calendar events.
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
