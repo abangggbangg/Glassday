@@ -23,6 +23,7 @@ Glassday is built as a SwiftUI shell around a hand-written HTML/CSS/JS interface
   - **Year**: all 12 months, shaded by how busy each day is.
 - **Inbox**: to-dos with no time yet. Your top inbox items also appear as quick bubbles at the top of the Timeline.
 - **Overdue**: missed tasks are collected with a one-tap *Move to today*.
+- **All-day and multi-day events**: holidays, trips and deadlines sit in their own strip at the top of the Timeline, and as spanning bars at the top of Week and Month. They never overlap timed tasks. Type `Penang trip Fri to Sun` or `Hackathon 12/11 to 14/11` and Glassday makes it all-day.
 - **Repeating tasks**: daily, weekdays or weekly.
 - **Overlap warnings** when you schedule over another task.
 

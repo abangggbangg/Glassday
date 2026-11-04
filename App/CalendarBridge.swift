@@ -138,9 +138,8 @@ final class CalendarBridge: NSObject, WKScriptMessageHandler {
                 "editable": e.calendar.allowsContentModifications,
                 "rep": repeatName(e)
             ]
-            if e.isAllDay {
-                item["endDate"] = key(end.addingTimeInterval(-1))
-            } else {
+            item["endDate"] = key(end.addingTimeInterval(-1))
+            if !e.isAllDay {
                 item["start"] = cal.component(.hour, from: start) * 60 + cal.component(.minute, from: start)
                 item["dur"] = max(5, Int(end.timeIntervalSince(start) / 60))
             }
@@ -175,10 +174,24 @@ final class CalendarBridge: NSObject, WKScriptMessageHandler {
     private func upsert(_ b: [String: Any]) {
         let req = b["reqId"] as? String ?? ""
         guard hasAccess else { return reply(req, nil, "Calendar access is off") }
-        guard let day = b["date"] as? String, let base = date(day),
-              let startMin = b["start"] as? Int, let dur = b["dur"] as? Int,
-              let start = cal.date(byAdding: .minute, value: startMin, to: base) else {
-            return reply(req, nil, "Missing date or time")
+        guard let day = b["date"] as? String, let base = date(day) else {
+            return reply(req, nil, "Missing date")
+        }
+        let allDay = (b["allDay"] as? Bool) ?? false
+        let start: Date
+        let finish: Date
+        if allDay {
+            // Inclusive last day, e.g. Fri → Sun is three days.
+            let last = (b["endDate"] as? String).flatMap { date($0) } ?? base
+            start = base
+            finish = cal.date(byAdding: .second, value: 86_399, to: max(last, base)) ?? base
+        } else {
+            guard let startMin = b["start"] as? Int, let dur = b["dur"] as? Int,
+                  let s = cal.date(byAdding: .minute, value: startMin, to: base) else {
+                return reply(req, nil, "Missing time")
+            }
+            start = s
+            finish = s.addingTimeInterval(TimeInterval(max(5, dur) * 60))
         }
 
         var event: EKEvent
@@ -199,9 +212,9 @@ final class CalendarBridge: NSObject, WKScriptMessageHandler {
         guard event.calendar != nil else { return reply(req, nil, "No calendar to save into") }
 
         event.title = (b["title"] as? String) ?? "Untitled"
+        event.isAllDay = allDay
         event.startDate = start
-        event.endDate = start.addingTimeInterval(TimeInterval(max(5, dur) * 60))
-        event.isAllDay = false
+        event.endDate = finish
         if let notes = b["notes"] as? String { event.notes = notes.isEmpty ? nil : notes }
 
         if let rep = b["repeat"] as? String, rep != "custom" {
