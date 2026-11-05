@@ -158,6 +158,10 @@ final class CalendarBridge: NSObject, WKScriptMessageHandler {
             if days == Set(2...6) { return "weekdays" }
             if days.count <= 1 { return "weekly" }
             return "custom"
+        case .monthly where rule.interval == 1 && (rule.daysOfTheWeek ?? []).isEmpty:
+            return "monthly"
+        case .yearly where rule.interval == 1:
+            return "yearly"
         default:
             return "custom"
         }
@@ -230,12 +234,20 @@ final class CalendarBridge: NSObject, WKScriptMessageHandler {
         scheduleReload()
     }
 
+    /// span: "one" = this occurrence, "future" = this and later, "all" = the whole series
     private func delete(_ b: [String: Any]) {
-        guard hasAccess, let series = b["series"] as? String, let occ = b["occDate"] as? String,
-              let event = occurrence(series, on: occ) else { scheduleReload(); return }
-        let span: EKSpan = (b["span"] as? String) == "future" ? .futureEvents : .thisEvent
-        do { try store.remove(event, span: span, commit: true) }
-        catch { reply("delete", nil, error.localizedDescription) }
+        guard hasAccess, let series = b["series"] as? String else { scheduleReload(); return }
+        let span = b["span"] as? String ?? "one"
+        do {
+            if span == "all", let first = store.calendarItem(withIdentifier: series) as? EKEvent {
+                // For a repeating event this is the first occurrence, so "future" removes every repeat.
+                try store.remove(first, span: .futureEvents, commit: true)
+            } else if let occ = b["occDate"] as? String, let event = occurrence(series, on: occ) {
+                try store.remove(event, span: span == "one" ? .thisEvent : .futureEvents, commit: true)
+            }
+        } catch {
+            reply("delete", nil, error.localizedDescription)
+        }
         scheduleReload()
     }
 
@@ -245,6 +257,10 @@ final class CalendarBridge: NSObject, WKScriptMessageHandler {
             return EKRecurrenceRule(recurrenceWith: .daily, interval: 1, end: nil)
         case "weekly":
             return EKRecurrenceRule(recurrenceWith: .weekly, interval: 1, end: nil)
+        case "monthly":
+            return EKRecurrenceRule(recurrenceWith: .monthly, interval: 1, end: nil)
+        case "yearly":
+            return EKRecurrenceRule(recurrenceWith: .yearly, interval: 1, end: nil)
         case "weekdays":
             let days = (2...6).compactMap { EKWeekday(rawValue: $0) }.map { EKRecurrenceDayOfWeek($0) }
             return EKRecurrenceRule(recurrenceWith: .weekly, interval: 1, daysOfTheWeek: days,
