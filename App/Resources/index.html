@@ -114,6 +114,11 @@ header{padding-block:14px 10px;display:flex;flex-direction:column;gap:12px}
 @keyframes gone{to{opacity:0;transform:scale(.4) translateY(-10px)}}
 .banner{display:flex;gap:10px;align-items:center;padding:10px 12px;border-radius:16px;background:var(--glass-soft);font-size:12.5px;color:var(--ink2);margin:12px 0 0}
 .banner button{margin-left:auto;font-weight:700;color:var(--accent);white-space:nowrap}
+.primer{display:flex;gap:12px;align-items:flex-start;padding:14px;border-radius:20px;background:var(--glass-strong);border:1px solid var(--stroke);margin:12px 0 0;animation:fadeUp .4s cubic-bezier(.2,.8,.2,1)}
+.primer .pi{width:40px;height:40px;flex:none;border-radius:13px;display:grid;place-items:center;color:var(--on-accent);background:var(--accent)}
+.primer b{font-family:var(--f-display);font-size:16px}
+.primer p{margin:4px 0 10px;font-size:13px;line-height:1.45;color:var(--ink2)}
+.primer .pa{display:flex;gap:8px;align-items:center}
 
 /* timeline */
 .tl{position:relative;padding-top:12px}
@@ -735,6 +740,9 @@ function vTimeline(){
     return `<div class="adc ${done?'done':''}" style="--c:${a.color};--n:${i}"><button class="chk ${done?'on':''}" data-act="check" data-id="${a.id}" data-k="${a.date}" aria-label="Mark ${esc(a.title)} ${done?'not done':'done'}">${ic('tick',14,3)}</button>
       <button class="adt" data-act="edit" data-id="${a.id}"><span class="ic">${ic(a.icon||'star',17)}</span><span><b>${esc(a.title)}</b><small>${adLabel(a,sel)}</small></span></button></div>`}).join('')}</div></div>`;
   if(q.length) h+=`<div class="quick" aria-label="Quick to-dos">${q.map(t=>`<button class="qb" data-act="quick" data-id="${t.id}" style="--c:${t.color}"><span class="c">${ic(t.icon,24)}</span>${esc(t.title)}</button>`).join('')}</div>`;
+  if(NATIVE&&NAT.access==='ask'&&!NAT.later) h+=`<div class="primer" role="group" aria-labelledby="primer-t"><span class="pi">${ic('week',22)}</span>
+    <div><b id="primer-t">Connect Apple Calendar</b><p>See your calendar events on this timeline, and save the tasks you schedule as real events. Inbox to-dos stay on this phone either way.</p>
+    <div class="pa"><button class="btn sm" data-act="cal-connect">Connect</button><button class="pill-btn" data-act="cal-later">Not now</button></div></div></div>`;
   if(NATIVE&&NAT.access==='denied') h+=`<div class="banner">${ic('week',16)}<span>Calendar access is off. Turn it on in iOS Settings → Apps → Glassday → Calendars to sync.</span></div>`;
   if(S.tasks.some(t=>t.sample)) h+=`<div class="banner">${ic('spark',16)}<span>These are example tasks to show how it works.</span><button data-act="clear-sample">Clear examples</button></div>`;
   if(!items.length){
@@ -900,8 +908,8 @@ function vSettings(){
      <div class="row"><span>Day ends</span><select class="sel" id="de">${hrs(13,24,st.dayEnd)}</select></div>
    </section>
    ${NATIVE?`<section class="card glass"><div class="label" style="margin-bottom:6px">Apple Calendar</div>
-     <div class="row"><span>Status</span><b style="color:${NAT.access==='granted'?'var(--ink)':'var(--now)'}">${NAT.access==='granted'?'Connected':NAT.access==='pending'?'Checking…':'Not allowed'}</b></div>
-     ${NAT.access==='granted'?`<div class="row"><span>New events go to</span><select class="sel" id="calsel" style="max-width:55%">${NAT.cals.map(c=>`<option value="${esc(c.id)}" ${c.id===S.settings.calId?'selected':''}>${esc(c.title)}</option>`).join('')}</select></div>`
+     <div class="row"><span>Status</span><b style="color:${NAT.access==='granted'?'var(--ink)':'var(--now)'}">${NAT.access==='granted'?'Connected':NAT.access==='pending'?'Checking…':NAT.access==='ask'?'Not connected':'Not allowed'}</b></div>
+     ${NAT.access==='ask'?`<div class="row"><span class="muted">Show your events here and save tasks to Calendar.</span><button class="btn sm" data-act="cal-connect">Connect</button></div>`:NAT.access==='granted'?`<div class="row"><span>New events go to</span><select class="sel" id="calsel" style="max-width:55%">${NAT.cals.map(c=>`<option value="${esc(c.id)}" ${c.id===S.settings.calId?'selected':''}>${esc(c.title)}</option>`).join('')}</select></div>`
        :`<p class="muted">Turn on access in iOS Settings → Apps → Glassday → Calendars, then reopen the app.</p>`}
      <p class="muted" style="margin:6px 0 0">Scheduled tasks are real Apple Calendar events, so edits show up in both places. Inbox to-dos, icons and ticks are kept in this app.</p></section>`:''}
    <section class="card glass">
@@ -1227,6 +1235,8 @@ document.addEventListener('click',e=>{
       save(); render('fade');
       toast(`${t.title} → today${t.allDay?'':' '+fT(t.start)}`,()=>{t.date=old.date;t.start=old.start;t.endDate=old.endDate;save();render()}); } break;
     case 'plan': autoPlan(); break;
+    case 'cal-connect': post({type:'access'}); buzz(6); break;
+    case 'cal-later': NAT.later=true; render(); toast('You can connect Apple Calendar any time in Settings'); break;
     case 'ex': { const ta=document.getElementById('smart-in'); ta.value=a.textContent; parsed=parse(ta.value); document.getElementById('pv').innerHTML=pvHtml(parsed); buzz(5); break; }
     case 'pv-add': if(parsed){const nt=commitParsed(parsed); parsed=null; const ta=document.getElementById('smart-in'); if(ta)ta.value='';
       render(); toast(nt.allDay?`Added all-day · ${fmtRange(nt.date,nt.endDate)}`:nt.date?`Added to ${DN[dow(nt.date)]} ${fT(nt.start)}`:'Added to Inbox',nt.pend?null:()=>{S.tasks=S.tasks.filter(x=>x!==nt);save();render()}); buzz([10,30,15])} break;
@@ -1392,7 +1402,7 @@ applyTheme(); render('fade'); setTimeout(scrollToNow,120);
   sp.addEventListener('click',leave);
   setTimeout(leave, reduce?250:2300);
 })();
-if(NATIVE){post({type:'ready'}); post({type:'access'})}
+if(NATIVE){post({type:'ready'}); post({type:'status'})}
 })();
 </script>
 

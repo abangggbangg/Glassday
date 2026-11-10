@@ -138,7 +138,8 @@ Glassday/
 | `type` | Payload | Purpose |
 |---|---|---|
 | `ready` | | Page loaded; flush any pending deep link |
-| `access` | | Request or confirm calendar access |
+| `status` | | Report calendar access without prompting (`GDN.access('ask' / 'granted' / 'denied')`) |
+| `access` | | Show the system calendar prompt (only after the person taps Connect) |
 | `load` | `from`, `to` (YYYY-MM-DD) | Fetch events in a date window |
 | `upsert` | `reqId`, `series?`, `occDate?`, `title`, `date`, `start`, `dur`, `repeat`, `notes`, `calId` | Create or update an event |
 | `delete` | `series`, `occDate`, `span` (`one`/`future`) | Remove an event |
@@ -191,7 +192,7 @@ open Glassday.xcodeproj
 4. On your iPhone, turn on **Settings → Privacy & Security → Developer Mode** and restart when asked.
 5. Plug in your phone, select it as the run destination, and press **▶ Run**.
 6. If prompted, go to **Settings → General → VPN & Device Management** on the phone and trust your developer profile.
-7. Open Glassday and allow **Full Access** to Calendar.
+7. Open Glassday, tap **Connect** on the *Connect Apple Calendar* card, and allow **Full Access**. (Glassday never asks on launch; you can also connect later from **Settings → Apple Calendar**.)
 8. Add the widget: long-press the home screen, then **Edit → Add Widget → Glassday**.
 
 > **Free Apple ID:** apps signed with a free account expire after **7 days**. Re-run from Xcode to renew; your data stays. To renew automatically instead, use the free Sideloadly method below.

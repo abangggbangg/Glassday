@@ -40,6 +40,8 @@ final class CalendarBridge: NSObject, WKScriptMessageHandler {
         case "ready":
             pageReady = true
             if let day = pendingDay { pendingDay = nil; openDay(day) }
+        case "status":
+            reportStatus()
         case "access":
             requestAccess()
         case "load":
@@ -65,19 +67,24 @@ final class CalendarBridge: NSObject, WKScriptMessageHandler {
 
     // MARK: access
 
-    private func requestAccess() {
+    /// Tell the page where access stands without ever showing the system prompt.
+    /// "ask" means not decided yet: the page explains why before asking (HIG: ask in context).
+    private func reportStatus() {
         switch EKEventStore.authorizationStatus(for: .event) {
-        case .fullAccess:
-            accessGranted()
-        case .notDetermined:
-            store.requestFullAccessToEvents { [weak self] granted, _ in
-                DispatchQueue.main.async {
-                    guard let self else { return }
-                    if granted { self.store.reset(); self.accessGranted() } else { self.run("GDN.access('denied')") }
-                }
+        case .fullAccess: accessGranted()
+        case .notDetermined: run("GDN.access('ask')")
+        default: run("GDN.access('denied')")
+        }
+    }
+
+    /// Only called when the person taps Connect on the page.
+    private func requestAccess() {
+        guard EKEventStore.authorizationStatus(for: .event) == .notDetermined else { return reportStatus() }
+        store.requestFullAccessToEvents { [weak self] granted, _ in
+            DispatchQueue.main.async {
+                guard let self else { return }
+                if granted { self.store.reset(); self.accessGranted() } else { self.reportStatus() }
             }
-        default:
-            run("GDN.access('denied')")
         }
     }
 
@@ -99,7 +106,7 @@ final class CalendarBridge: NSObject, WKScriptMessageHandler {
 
     func appBecameActive() {
         guard pageReady else { return }
-        requestAccess()   // picks up a permission change made in Settings
+        reportStatus()   // picks up a permission change made in Settings; never prompts
     }
 
     @objc private func storeChanged() {
