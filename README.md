@@ -69,8 +69,9 @@ Glassday is built as a SwiftUI shell around a hand-written HTML/CSS/JS interface
   - Scheduled tasks are real calendar events.
   - Changes made in Apple Calendar, or in Google/Outlook accounts added to iOS, appear in Glassday instantly.
 - **Widgets**:
-  - **Month** (large): Sunday-first month grid with event bars. Tap a day to open it in the app.
+  - **Month** (large): Sunday-first month grid with event bars. Tap a day to open it in the app; tap the title to open today.
   - **Today** (small / medium): what's next today.
+  - Without calendar access, both widgets show *Tap to connect Apple Calendar* and open the app when tapped.
 - **Deep links**: `glassday://day/YYYY-MM-DD` opens a specific day.
 
 ---

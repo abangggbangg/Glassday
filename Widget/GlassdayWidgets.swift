@@ -65,13 +65,16 @@ struct NeedAccessView: View {
             Image(systemName: "calendar.badge.exclamationmark")
                 .font(.system(size: 28, weight: .semibold))
                 .foregroundStyle(Palette.gold)
-            Text("Open Glassday and allow calendar access")
+            // The whole widget opens the app (widgetURL), where the Connect card is.
+            Text("Tap to connect Apple Calendar")
                 .font(.system(size: 13, weight: .semibold, design: .rounded))
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
         }
         .padding()
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Glassday needs calendar access. Opens Glassday to connect Apple Calendar.")
     }
 }
 
@@ -268,6 +271,8 @@ struct MonthWidget: Widget {
         StaticConfiguration(kind: "GlassdayMonth", provider: MonthProvider()) { entry in
             MonthWidgetView(entry: entry)
                 .containerBackground(for: .widget) { WidgetBackground() }
+                // Day cells link to their own day; anywhere else (title, or the no-access state) opens today.
+                .widgetURL(URL(string: "glassday://day/\(CalData.dayKey(entry.date))"))
         }
         .configurationDisplayName("Month")
         .description("Your whole month with Apple Calendar events. Tap a day to open it.")
