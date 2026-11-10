@@ -592,7 +592,10 @@ if(!S||!Array.isArray(S.tasks))S=seed();
 S.tasks.forEach(t=>{const i=OLD_COLORS.indexOf(t.color);if(i>=0)t.color=COLORS[i]});
 S.settings=Object.assign({theme:'system',dayStart:6,dayEnd:24},S.settings||{});
 S.meta=S.meta||{}; S.doneN=S.doneN||{}; S.allDay=[]; S.tasks=S.tasks.filter(t=>!t.ext&&!t.pend);
-const save=()=>{const data=JSON.stringify({settings:S.settings,tasks:S.tasks.filter(t=>!t.ext&&!t.pend),meta:S.meta,doneN:S.doneN});try{localStorage.setItem(LS,data)}catch(e){} if(NATIVE)post({type:'persist',data})};
+// One store per mode: UserDefaults (via persist) in the app, localStorage in a browser.
+// (The app still reads localStorage once above, to migrate data from older builds.)
+const save=()=>{const data=JSON.stringify({settings:S.settings,tasks:S.tasks.filter(t=>!t.ext&&!t.pend),meta:S.meta,doneN:S.doneN});
+  if(NATIVE) post({type:'persist',data}); else try{localStorage.setItem(LS,data)}catch(e){} };
 let sel=today(), view='timeline', draft=null, undoFn=null, lastDir='', calMode=S.settings.calMode||'month';
 
 function ruleHit(t,k){
