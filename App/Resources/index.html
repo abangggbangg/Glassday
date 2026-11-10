@@ -61,6 +61,7 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;paddin
 input,select,textarea{font:inherit;color:var(--ink)}
 :focus-visible{outline:2px solid var(--accent2);outline-offset:2px;border-radius:10px}
 .num{font-variant-numeric:tabular-nums}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 /* HIG 44pt minimum hit area for small controls, without changing how they look */
 .chk,.cpick,.icon-btn,.date-title button{position:relative}
 .chk::after,.cpick::after,.icon-btn::after,.date-title button::after{content:"";position:absolute;inset:min(0px,calc((100% - 44px) / 2))}
@@ -485,9 +486,9 @@ input[type=date].inp,input[type=time].inp{-webkit-appearance:none;appearance:non
   <button class="fab" data-act="add" aria-label="Add task"></button>
 </div></div>
 <div class="scrim" id="scrim" data-act="close"></div>
-<div class="sheet" id="sheet" role="dialog" aria-modal="true"></div>
+<div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title"></div>
 <div class="focus" id="focus"></div>
-<div class="toast glass" id="toast"></div>
+<div class="toast glass" id="toast" role="status" aria-live="polite"></div>
 <div class="fx" id="fx"></div>
 
 <script>
@@ -529,6 +530,7 @@ const ic=(n,s=22,w=2)=>`<svg viewBox="0 0 24 24" width="${s}" height="${s}" fill
 const TASK_ICONS=['alarm','coffee','book','code','laptop','camera','video','dumbbell','bike','car','food','drop','moon','phone','users','cart','heart','music','sun','task','star'];
 const OLD_COLORS=['#B4846C','#56677E','#232C3A','#6B2E39','#7E8C6E','#B08F58','#5E4E6E','#3D6965'];
 const COLORS=['#F08A7E','#5B7DB1','#2E4A6B','#8F3F65','#7BB662','#EFA92E','#8E7FE6','#33A6A0'];
+const COLOR_NAMES=['Coral','Blue','Navy','Plum','Green','Amber','Violet','Teal'];
 
 /* ---------- dates ---------- */
 const pad=n=>String(n).padStart(2,'0');
@@ -730,7 +732,7 @@ function renderHeader(){
   const ws=weekStart(sel), T=today(); let cells='';
   for(let i=0;i<7;i++){
     const key=addD(ws,i), dd=pd(key), tk=[...allDayOn(key),...dayTasks(key)].slice(0,4);
-    cells+=`<button class="wd ${key===T?'today':''} ${key===sel?'sel':''}" data-act="day" data-k="${key}" aria-label="${DN[dd.getDay()]} ${dd.getDate()}">
+    cells+=`<button class="wd ${key===T?'today':''} ${key===sel?'sel':''}" data-act="day" data-k="${key}" aria-pressed="${key===sel}" aria-label="${DN[dd.getDay()]} ${dd.getDate()} ${MON[dd.getMonth()]}${key===T?', today':''}, ${dayTasks(key).length+allDayOn(key).length} items">
       <span class="dn">${DN[dd.getDay()]}</span><span class="n num">${dd.getDate()}</span>
       <span class="dots">${tk.map(t=>`<b style="background:${t.color};opacity:${isDone(t,key)?.35:1}"></b>`).join('')}</span></button>`;
   }
@@ -739,7 +741,7 @@ function renderHeader(){
    <div class="hrow">
      <h1 class="date-title"><span class="num">${d.getDate()}.</span> <span class="mo">${MON[d.getMonth()]}</span> <span class="acc num">${d.getFullYear()}</span>
        <button data-act="today" aria-label="Jump to today" title="Today">${ic('right',22,2.6)}</button></h1>
-     <div class="ring glass" title="${dn} of ${tot} done"><svg viewBox="0 0 44 44"><circle class="t" cx="22" cy="22" r="19"/><circle class="p" cx="22" cy="22" r="19" stroke-dasharray="${C}" stroke-dashoffset="${off}"/></svg><span class="num">${dn}/${tot}</span></div>
+     <div class="ring glass" title="${dn} of ${tot} done" role="img" aria-label="${dn} of ${tot} tasks done"><svg viewBox="0 0 44 44"><circle class="t" cx="22" cy="22" r="19"/><circle class="p" cx="22" cy="22" r="19" stroke-dasharray="${C}" stroke-dashoffset="${off}"/></svg><span class="num">${dn}/${tot}</span></div>
    </div>
    <div class="strip glass" id="strip"><span class="wbub" style="--i:${idx}"></span>${cells}</div>`;
 }
@@ -748,7 +750,7 @@ function renderHeader(){
 const TABS=[['inbox','Inbox','inbox'],['timeline','Timeline','timeline'],['week','Calendar','week'],['smart','Smart','spark'],['settings','Settings','gear']];
 function renderNav(){
   const i=TABS.findIndex(t=>t[0]===view);
-  document.getElementById('nav').innerHTML=`<span class="nbub" style="--i:${i}"></span>`+TABS.map(([v,l,n])=>`<button class="${v===view?'on':''}" data-act="tab" data-v="${v}">${ic(n,21)}<span>${l}</span></button>`).join('');
+  document.getElementById('nav').innerHTML=`<span class="nbub" style="--i:${i}"></span>`+TABS.map(([v,l,n])=>`<button class="${v===view?'on':''}" data-act="tab" data-v="${v}" ${v===view?'aria-current="page"':''}>${ic(n,21)}<span>${l}</span></button>`).join('');
 }
 
 /* ---------- views ---------- */
@@ -774,14 +776,14 @@ function vTimeline(){
     return h;
   }
   h+='<div class="tl">'; let n=0, prevEnd=null;
-  const nowMark=pct=>`<div class="now" style="top:${pct}%"><span>${fT(nm)}</span></div>`;
+  const nowMark=pct=>`<div class="now" style="top:${pct}%"><span><b class="sr">Now, </b>${fT(nm)}</span></div>`;
   const de=S.settings.dayEnd*60;
   items.forEach((t,i)=>{
     const end=t.start+t.dur;
     if(prevEnd!=null||(isT&&nm<t.start)){
       const gs=prevEnd??Math.min(nm,t.start), gap=t.start-gs, nowIn=isT&&nm>=gs&&nm<t.start;
       const showFree=prevEnd!=null&&gap>=30;
-      h+=`<div class="tl-gap ${showFree||nowIn?'big':''}">${nowIn?nowMark(gap>0?(nm-gs)/gap*100:50):''}${showFree?`<button class="free" data-act="free" data-s="${gs}" data-d="${Math.min(gap,60)}">${ic('plus',14,2.4)} ${fD(gap)} free</button>`:''}</div>`;
+      h+=`<div class="tl-gap ${showFree||nowIn?'big':''}">${nowIn?nowMark(gap>0?(nm-gs)/gap*100:50):''}${showFree?`<button class="free" data-act="free" data-s="${gs}" data-d="${Math.min(gap,60)}" aria-label="${fD(gap)} free from ${fT(gs)}. Add a task here">${ic('plus',14,2.4)} ${fD(gap)} free</button>`:''}</div>`;
     }
     const done=isDone(t,sel), live=isT&&nm>=t.start&&nm<end&&!done;
     const ph=Math.max(56,Math.min(t.dur*1.15,230)), el=live?(nm-t.start)/t.dur*100:0;
@@ -797,7 +799,7 @@ function vTimeline(){
   });
   if(prevEnd<de){
     const nowIn=isT&&nm>=prevEnd;
-    h+=`<div class="tl-gap big">${nowIn?nowMark(20):''}<button class="free" data-act="free" data-s="${Math.max(prevEnd,isT?Math.ceil(nm/15)*15:0)}" data-d="30">${ic('plus',14,2.4)} Free until ${fT(de)}</button></div>`;
+    h+=`<div class="tl-gap big">${nowIn?nowMark(20):''}<button class="free" data-act="free" data-s="${Math.max(prevEnd,isT?Math.ceil(nm/15)*15:0)}" data-d="30" aria-label="Free until ${fT(de)}. Add a task">${ic('plus',14,2.4)} Free until ${fT(de)}</button></div>`;
   }
   return h+'</div></section>';
 }
@@ -815,10 +817,10 @@ function vWeek(){
     const L=Math.max(1,lanes.length);
     let blocks=ts.map((t,j)=>{
       const top=Math.max(0,(t.start-ds*60)/60*H), hh=Math.max(20,t.dur/60*H-3);
-      return `<button class="wb ${isDone(t,k)?'done':''}" data-act="edit" data-id="${t.id}" data-k="${k}" style="--c:${t.color};--n:${n++};top:${top}px;height:${hh}px;left:${pos[j]/L*100}%;width:calc(${100/L}% - 2px)">${esc(t.title)}${hh>34?`<small>${fT(t.start)}</small>`:''}</button>`;
+      return `<button class="wb ${isDone(t,k)?'done':''}" data-act="edit" data-id="${t.id}" data-k="${k}" aria-label="${esc(t.title)}, ${DN[d.getDay()]} ${fT(t.start)} to ${fT(t.start+t.dur)}${isDone(t,k)?', done':''}" style="--c:${t.color};--n:${n++};top:${top}px;height:${hh}px;left:${pos[j]/L*100}%;width:calc(${100/L}% - 2px)">${esc(t.title)}${hh>34?`<small>${fT(t.start)}</small>`:''}</button>`;
     }).join('');
     const nm=nowM(); const nl=isT&&nm>=ds*60&&nm<=de*60?`<div class="wk-now" style="top:${(nm-ds*60)/60*H}px"></div>`:'';
-    cols+=`<div class="wk-col ${isT?'t':''} ${k===sel?'s':''}" data-act="wkslot" data-k="${k}" style="height:${gh}px">${blocks}${nl}</div>`;
+    cols+=`<div class="wk-col ${isT?'t':''} ${k===sel?'s':''}" data-act="wkslot" data-k="${k}" role="button" aria-label="Add a task on ${DN[d.getDay()]} ${d.getDate()}" style="height:${gh}px">${blocks}${nl}</div>`;
   }
   const segs=packSegs(ws,addD(ws,6)), AL=segs.reduce((x,s)=>Math.max(x,s.lane+1),0);
   const adRow=AL?`<div class="wk-ad"><span class="wk-adl">All day</span><div class="wk-adb" style="height:${AL*21}px">${segs.map(s=>`<button class="wbar ${s.cs?'cs':''} ${s.ce?'ce':''} ${isDone(s.a,s.a.date)?'done':''}" data-act="edit" data-id="${s.a.id}" style="--c:${s.a.color};left:calc(${s.c0} * (100% + 2px) / 7);width:calc(${s.c1-s.c0+1} * (100% + 2px) / 7 - 2px);top:${s.lane*21}px">${esc(s.a.title)}</button>`).join('')}</div></div>`:'';
@@ -827,7 +829,7 @@ function vWeek(){
     <p class="muted" style="margin:12px 6px 4px;font-size:12px">Tap an empty spot to add a task at that time. Swipe to change week.</p></section>`;
 }
 
-const modeSeg=()=>`<div class="mode"><div class="seg">${['week','month','year'].map(m=>`<button class="${calMode===m?'on':''}" data-act="mode" data-v="${m}">${m[0].toUpperCase()+m.slice(1)}</button>`).join('')}</div></div>`;
+const modeSeg=()=>`<div class="mode"><div class="seg">${['week','month','year'].map(m=>`<button class="${calMode===m?'on':''}" data-act="mode" data-v="${m}" aria-pressed="${calMode===m}">${m[0].toUpperCase()+m.slice(1)}</button>`).join('')}</div></div>`;
 const calNav=label=>`<div class="calnav"><button class="icon-btn" data-act="calstep" data-n="-1" aria-label="Previous">${ic('left',20)}</button><b>${label}</b><button class="icon-btn" data-act="calstep" data-n="1" aria-label="Next">${ic('right',20)}</button></div>`;
 function itemsOn(k){return [...allDayOn(k).map(a=>({title:a.title,color:a.color,ad:1})),...dayTasks(k)]}
 function vMonth(){
@@ -1085,7 +1087,7 @@ function firstFreeBuffered(k,dur){
 const sheet=document.getElementById('sheet'), scrim=document.getElementById('scrim');
 function openSheet(html){
   const h=html.indexOf('</h3>')+5, f=html.lastIndexOf('<div class="actions">');
-  const head=html.slice(0,h), body=html.slice(h,f>h?f:html.length), foot=f>h?html.slice(f):'';
+  const head=html.slice(0,h).replace('<h3>','<h3 id="sheet-title">'), body=html.slice(h,f>h?f:html.length), foot=f>h?html.slice(f):'';
   sheet.style.transform=''; sheet.classList.remove('dragging');
   sheet.innerHTML=`<div class="sheet-head" id="grab"><div class="grab"></div><button class="icon-btn sheet-x" data-act="close" aria-label="Close" type="button">${ic('x',18,2.4)}</button>${head}</div><div class="sheet-body" id="sheet-body">${body}</div>${foot?`<div class="sheet-foot">${foot}</div>`:''}`;
   scrim.classList.add('open'); sheet.classList.add('open'); buzz(5);
@@ -1099,8 +1101,8 @@ function editSheet(t,isNew){
    ${!t.ext&&isRep(t)&&!isNew?`<p class="muted" style="margin:-6px 2px 14px">Repeats ${repLabel[t.repeat].toLowerCase()}. Changes here apply to every time it repeats.</p>`:''}
    ${t.ext?`<p class="muted" style="margin:-6px 2px 14px">From Apple Calendar · ${esc(t.cal||'')}${t.timedSpan?'. This event runs across several days with set times. Change its times in Apple Calendar; you can change its icon and colour here.':ro?'. This calendar is read-only, but you can change its icon and colour.':t.rep!=='none'?'. Changes apply to this and future repeats.':''}</p>`:''}
    <label class="field"><span>Title</span><input class="inp big" ${D} id="f-title" value="${esc(draft.title)}" placeholder="What’s the plan?" autocomplete="off"></label>
-   <div class="field"><span>Icon</span><div class="pick" id="f-icons">${TASK_ICONS.map(n=>`<button class="ipick ${n===draft.icon?'on':''}" style="--c:${draft.color}" data-act="f-icon" data-v="${n}" aria-label="${n}">${ic(n,20)}</button>`).join('')}</div></div>
-   <div class="field"><span>Colour</span><div class="pick">${COLORS.map(c=>`<button class="cpick ${c===draft.color?'on':''}" style="--c:${c}" data-act="f-color" data-v="${c}" aria-label="Colour ${c}"></button>`).join('')}</div></div>
+   <div class="field"><span>Icon</span><div class="pick" id="f-icons">${TASK_ICONS.map(n=>`<button class="ipick ${n===draft.icon?'on':''}" style="--c:${draft.color}" data-act="f-icon" data-v="${n}" aria-label="${n} icon" aria-pressed="${n===draft.icon}">${ic(n,20)}</button>`).join('')}</div></div>
+   <div class="field"><span>Colour</span><div class="pick">${COLORS.map(c=>`<button class="cpick ${c===draft.color?'on':''}" style="--c:${c}" data-act="f-color" data-v="${c}" aria-label="${COLOR_NAMES[COLORS.indexOf(c)]||'Colour'}" aria-pressed="${c===draft.color}"></button>`).join('')}</div></div>
    <button class="toggle" data-act="f-inbox" type="button" ${ro?'hidden':''}><span><b>Keep in Inbox</b><br><small class="muted">No set time yet</small></span><span class="sw ${inb?'on':''}" id="f-sw"></span></button>
    <div id="f-when" ${inb?'hidden':''}>
      <button class="toggle" data-act="f-allday" type="button" ${ro?'hidden':''}><span><b>All-day</b><br><small class="muted">Holidays, trips, deadlines. Can span several days.</small></span><span class="sw ${ad?'on':''}" id="f-adsw"></span></button>
@@ -1118,7 +1120,7 @@ function editSheet(t,isNew){
      </div>
      </div>
      ${LIVE()&&!ro&&NAT.cals.length?`<label class="field"><span>Calendar</span><select class="inp" id="f-cal">${NAT.cals.map(c=>`<option value="${esc(c.id)}" ${c.id===(draft.calId||S.settings.calId)?'selected':''}>${esc(c.title)}</option>`).join('')}</select></label>`:''}
-     <div class="field" id="f-repf" ${ro?'hidden':''}><span>Repeat</span><div class="seg" style="flex-wrap:wrap">${Object.keys(repLabel).filter(r=>r!=='custom'||draft.repeat==='custom').map(r=>`<button type="button" class="${draft.repeat===r?'on':''}" data-act="f-rep" data-v="${r}">${r==='none'?'Once':repLabel[r]}</button>`).join('')}</div></div>
+     <div class="field" id="f-repf" ${ro?'hidden':''}><span>Repeat</span><div class="seg" style="flex-wrap:wrap">${Object.keys(repLabel).filter(r=>r!=='custom'||draft.repeat==='custom').map(r=>`<button type="button" class="${draft.repeat===r?'on':''}" data-act="f-rep" data-v="${r}" aria-pressed="${draft.repeat===r}">${r==='none'?'Once':repLabel[r]}</button>`).join('')}</div></div>
    </div>
    <div class="field" id="f-durf" ${ro||(ad&&!inb)?'hidden':''}><span class="dhead">Duration <b id="f-dlabel">${fD(draft.dur)}</b></span>
      <div class="wheels"><div class="wband"></div>
@@ -1272,8 +1274,8 @@ document.addEventListener('click',e=>{
     case 'pv-edit': if(parsed){const p=parsed; let st=p.start; if(p.date&&st==null&&!p.allDay)st=firstFree(p.date,p.dur);
       editSheet({id:uid(),title:p.title,icon:p.icon,color:p.color,date:p.date,start:st,dur:p.dur,repeat:p.repeat,done:{},notes:'',allDay:!!p.allDay,endDate:p.endDate},true)} break;
     case 'close': closeSheet(); break;
-    case 'f-icon': draft.icon=a.dataset.v; sheet.querySelectorAll('.ipick').forEach(b=>b.classList.toggle('on',b===a)); break;
-    case 'f-color': draft.color=a.dataset.v; sheet.querySelectorAll('.cpick').forEach(b=>b.classList.toggle('on',b===a)); sheet.querySelectorAll('.ipick').forEach(b=>b.style.setProperty('--c',draft.color)); break;
+    case 'f-icon': draft.icon=a.dataset.v; sheet.querySelectorAll('.ipick').forEach(b=>{b.classList.toggle('on',b===a);b.setAttribute('aria-pressed',b===a)}); break;
+    case 'f-color': draft.color=a.dataset.v; sheet.querySelectorAll('.cpick').forEach(b=>{b.classList.toggle('on',b===a);b.setAttribute('aria-pressed',b===a)}); sheet.querySelectorAll('.ipick').forEach(b=>b.style.setProperty('--c',draft.color)); break;
     case 'f-inbox': { const w=document.getElementById('f-when'), sw=document.getElementById('f-sw'); w.hidden=!w.hidden; sw.classList.toggle('on',w.hidden);
       const df=document.getElementById('f-durf'); df.hidden=!w.hidden&&draft.allDay; if(!df.hidden) requestAnimationFrame(()=>setWheels(+document.getElementById('f-dur').value||30,false));
       if(!w.hidden&&!document.getElementById('f-time').value){const d=document.getElementById('f-date').value||sel; const s=firstFree(d,draft.dur); if(s!=null)document.getElementById('f-time').value=fT(s)} setDur(+document.getElementById('f-dur').value,'start'); break; }
@@ -1283,7 +1285,7 @@ document.addEventListener('click',e=>{
       $('f-adsw').classList.toggle('on',on); $('f-days').hidden=!on; $('f-timed').hidden=on; $('f-durf').hidden=on;
       if(!on){ requestAnimationFrame(()=>setWheels(+$('f-dur').value||30,false)); setDur(+$('f-dur').value||30,'start') } else checkWarn();
       buzz(6); break; }
-    case 'f-rep': draft.repeat=a.dataset.v; a.parentNode.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b===a)); break;
+    case 'f-rep': draft.repeat=a.dataset.v; a.parentNode.querySelectorAll('button').forEach(b=>{b.classList.toggle('on',b===a);b.setAttribute('aria-pressed',b===a)}); break;
     case 'f-dur': setDur(+a.dataset.v); buzz(5); break;
     case 'wpick': scrollWheel(a.dataset.w,+a.dataset.i,true); break;
     case 'save': { readForm(); const ti=document.getElementById('f-title');
