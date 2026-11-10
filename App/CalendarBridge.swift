@@ -24,7 +24,9 @@ final class CalendarBridge: NSObject, WKScriptMessageHandler {
     private var pendingDay: String?
     private var reloadWork: DispatchWorkItem?
     private var lastStatus: EKAuthorizationStatus?
-    private let cal = Calendar.current
+    /// Read fresh each time so a time-zone or calendar change while the app is running
+    /// doesn't skew day keys.
+    private var cal: Calendar { Calendar.current }
 
     override init() {
         super.init()
