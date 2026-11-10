@@ -31,9 +31,13 @@ struct CalItem {
 enum CalData {
     static var authorized: Bool { EKEventStore.authorizationStatus(for: .event) == .fullAccess }
 
+    /// One store per widget process: EKEventStore is expensive to create, and rebuilding the
+    /// month grid itself (at most 42 cells, about once an hour) is cheap, so this is the only cache
+    /// worth having. Lazily created on first use, which only happens once access is granted.
+    private static let store = EKEventStore()
+
     static func items(from start: Date, to end: Date) -> [CalItem] {
         guard authorized else { return [] }
-        let store = EKEventStore()
         let pred = store.predicateForEvents(withStart: start, end: end, calendars: nil)
         return store.events(matching: pred).compactMap { e in
             guard let s = e.startDate, let en = e.endDate else { return nil }
