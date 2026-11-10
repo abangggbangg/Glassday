@@ -245,6 +245,21 @@ struct DayCellView: View {
             .background(RoundedRectangle(cornerRadius: 7).fill(day.isToday ? Palette.gold.opacity(0.12) : Color.clear))
             .opacity(day.inMonth ? 1 : 0.35)
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(accessibilityText)
+        .accessibilityHint("Opens this day in Glassday")
+    }
+
+    /// "Tuesday 10 November, today, 3 events: Lecture, Lab, Gym"
+    private var accessibilityText: String {
+        var parts = [day.date.formatted(.dateTime.weekday(.wide).day().month(.wide))]
+        if day.isToday { parts.append("today") }
+        switch day.items.count {
+        case 0: parts.append("no events")
+        case 1: parts.append("1 event: \(day.items[0].title)")
+        default: parts.append("\(day.items.count) events: " + day.items.prefix(4).map(\.title).joined(separator: ", "))
+        }
+        return parts.joined(separator: ", ")
     }
 }
 
@@ -409,6 +424,10 @@ struct TodayWidgetView: View {
             }
         }
         .frame(height: compact ? 34 : 32)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(live
+            ? "\(item.title), now, ends \(item.end.formatted(date: .omitted, time: .shortened))"
+            : "\(item.title), \(item.start.formatted(date: .omitted, time: .shortened)) to \(item.end.formatted(date: .omitted, time: .shortened))")
     }
 }
 
