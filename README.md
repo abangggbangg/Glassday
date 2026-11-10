@@ -203,7 +203,7 @@ This keeps Apple Calendar sync and the widgets, costs nothing, and renews the ap
    ```bash
    ./build-ipa.sh
    ```
-   This creates `Glassday.ipa` with the app and widget inside.
+   This creates `Glassday.ipa` with the app and widget inside. If the widget didn't build, the script stops with an error instead of making an app without widgets. (`make-ipa.sh` still works and simply runs `build-ipa.sh`.)
 2. Install [Sideloadly](https://sideloadly.io) on your Mac. The first time, open it with right-click → **Open**.
 3. Plug in your iPhone, unlock it, and tap **Trust**. In Finder, select the iPhone, tick **Show this iPhone when on Wi-Fi**, and click **Apply**.
 4. In Sideloadly:
