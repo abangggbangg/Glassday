@@ -4,9 +4,20 @@ import WidgetKit
 
 // MARK: - Shared
 
+/// Light / dark pairs chosen to pass WCAG AA (4.5:1) as text on the widget background.
+/// (Following the app's selected theme needs an App Group; see REVIEW.md P3-1.)
 enum Palette {
-    static let gold = Color(red: 0.66, green: 0.51, blue: 0.31)
-    static let sunday = Color(red: 0.86, green: 0.29, blue: 0.27)
+    static let gold = adaptive(light: 0x8E6F42, dark: 0xD2B07A)     // 4.6:1 on white, 8.7:1 on dark
+    static let onGold = adaptive(light: 0xFFFFFF, dark: 0x16130D)   // text on a gold fill
+    static let sunday = adaptive(light: 0xC23B36, dark: 0xE0675E)
+
+    private static func adaptive(light: UInt32, dark: UInt32) -> Color {
+        Color(UIColor { $0.userInterfaceStyle == .dark ? rgb(dark) : rgb(light) })
+    }
+    private static func rgb(_ v: UInt32) -> UIColor {
+        UIColor(red: CGFloat(v >> 16 & 0xFF) / 255, green: CGFloat(v >> 8 & 0xFF) / 255,
+                blue: CGFloat(v & 0xFF) / 255, alpha: 1)
+    }
 }
 
 struct CalItem {
@@ -202,7 +213,7 @@ struct DayCellView: View {
             VStack(spacing: 1.5) {
                 Text("\(day.number)")
                     .font(.system(size: 12, weight: .bold, design: .rounded))
-                    .foregroundStyle(day.isToday ? Color.white : (day.isSunday ? Palette.sunday : Color.primary))
+                    .foregroundStyle(day.isToday ? Palette.onGold : (day.isSunday ? Palette.sunday : Color.primary))
                     .frame(width: 21, height: 17)
                     .background { if day.isToday { Capsule().fill(Palette.gold) } }
 
