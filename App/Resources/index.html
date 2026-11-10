@@ -355,7 +355,9 @@ nav button.on{color:var(--accent)} nav button.on svg{transform:translateY(-1px) 
   background:var(--glass-strong);-webkit-backdrop-filter:blur(30px) saturate(180%);backdrop-filter:blur(30px) saturate(180%);border:1px solid var(--stroke);border-bottom:0;
   transform:translateY(105%);transition:transform .5s cubic-bezier(.2,.95,.25,1),bottom .25s ease,max-height .25s ease;box-shadow:0 -10px 40px rgba(0,0,0,.15)}
 .sheet.dragging{transition:none}
-.sheet-head{flex:none;padding:8px max(18px,env(safe-area-inset-right,0px)) 2px max(18px,env(safe-area-inset-left,0px));touch-action:none;cursor:grab}
+.sheet-x{position:absolute;top:14px;right:max(12px,env(safe-area-inset-right,0px));width:44px;height:44px;border-radius:50%;background:var(--glass-soft);color:var(--ink2);z-index:2}
+.sheet-head h3{padding-right:52px}
+.sheet-head{position:relative;flex:none;padding:8px max(18px,env(safe-area-inset-right,0px)) 2px max(18px,env(safe-area-inset-left,0px));touch-action:none;cursor:grab}
 .sheet-body{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;touch-action:pan-y;
   padding:4px max(18px,env(safe-area-inset-right,0px)) 14px max(18px,env(safe-area-inset-left,0px))}
 .sheet-foot{flex:none;padding:12px max(18px,env(safe-area-inset-right,0px)) calc(14px + env(safe-area-inset-bottom,0px)) max(18px,env(safe-area-inset-left,0px));border-top:1px solid var(--hair)}
@@ -1064,7 +1066,7 @@ function openSheet(html){
   const h=html.indexOf('</h3>')+5, f=html.lastIndexOf('<div class="actions">');
   const head=html.slice(0,h), body=html.slice(h,f>h?f:html.length), foot=f>h?html.slice(f):'';
   sheet.style.transform=''; sheet.classList.remove('dragging');
-  sheet.innerHTML=`<div class="sheet-head" id="grab"><div class="grab"></div>${head}</div><div class="sheet-body" id="sheet-body">${body}</div>${foot?`<div class="sheet-foot">${foot}</div>`:''}`;
+  sheet.innerHTML=`<div class="sheet-head" id="grab"><div class="grab"></div><button class="icon-btn sheet-x" data-act="close" aria-label="Close" type="button">${ic('x',18,2.4)}</button>${head}</div><div class="sheet-body" id="sheet-body">${body}</div>${foot?`<div class="sheet-foot">${foot}</div>`:''}`;
   scrim.classList.add('open'); sheet.classList.add('open'); buzz(5);
 }
 function closeSheet(){sheet.style.transform=''; sheet.classList.remove('dragging'); const ae=document.activeElement; if(ae&&sheet.contains(ae))ae.blur(); sheet.classList.remove('open'); scrim.classList.remove('open'); draft=null; if(NAT.dirty){NAT.dirty=false; setTimeout(()=>render(),60)}}
