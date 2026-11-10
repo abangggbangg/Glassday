@@ -44,6 +44,8 @@ final class CalendarBridge: NSObject, WKScriptMessageHandler {
             reportStatus()
         case "access":
             requestAccess()
+        case "settings":
+            if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
         case "load":
             if let from = body["from"] as? String, let to = body["to"] as? String,
                let a = date(from), let b = date(to), let end = cal.date(byAdding: .day, value: 1, to: b) {
@@ -73,6 +75,7 @@ final class CalendarBridge: NSObject, WKScriptMessageHandler {
         switch EKEventStore.authorizationStatus(for: .event) {
         case .fullAccess: accessGranted()
         case .notDetermined: run("GDN.access('ask')")
+        case .writeOnly: run("GDN.access('limited')")   // can add events but not read them
         default: run("GDN.access('denied')")
         }
     }

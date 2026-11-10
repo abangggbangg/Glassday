@@ -143,12 +143,13 @@ Glassday/
 | `load` | `from`, `to` (YYYY-MM-DD) | Fetch events in a date window |
 | `upsert` | `reqId`, `series?`, `occDate?`, `title`, `date`, `start`, `dur`, `repeat`, `notes`, `calId` | Create or update an event |
 | `delete` | `series`, `occDate`, `span` (`one`/`future`) | Remove an event |
+| `settings` | | Open Glassday's page in iOS Settings (shown when access is off or add-only) |
 | `persist` | `data` (JSON string) | Save app-only state |
 | `haptic` | `style` (`light`/`medium`/`success`) | Haptic feedback |
 | `awake` | `on` | Keep the screen awake during focus |
 
 ### Native → page callbacks
-`GDN.access(status)`, `GDN.calendars(list, defaultId)`, `GDN.events(list, from, to)`, `GDN.saved(reqId, id, error)`, `GDN.openDay(key)`, `GDkb(keyboardHeight)`
+`GDN.access(status)` (`ask`, `granted`, `limited`, `denied`), `GDN.calendars(list, defaultId)`, `GDN.events(list, from, to)`, `GDN.saved(reqId, id, error)`, `GDN.openDay(key)`, `GDkb(keyboardHeight)`
 
 ### Rules for recurring and read-only events
 - Edits to a recurring event apply to **this and future** occurrences.
