@@ -12,7 +12,13 @@ struct ContentView: View {
             .background(Color("LaunchBackground"))
             .onOpenURL { model.open($0) }
             .onChange(of: scenePhase) { _, phase in
-                if phase == .active { model.bridge.appBecameActive() }
+                switch phase {
+                case .active: model.bridge.appBecameActive()
+                // Never leave the screen pinned awake behind our back; the page
+                // asks again when it is visible and a focus timer is still running.
+                case .background: UIApplication.shared.isIdleTimerDisabled = false
+                default: break
+                }
             }
     }
 }

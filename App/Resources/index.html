@@ -1377,7 +1377,10 @@ sheet.addEventListener('focusin',e=>{ const el=e.target; if(!el.matches('input,t
 
 /* live clock refresh */
 setInterval(()=>{ if(!sheet.classList.contains('open')&&(view==='timeline'||view==='week')&&sel===today()) render() },30000);
-document.addEventListener('visibilitychange',()=>{ if(!document.hidden&&!sheet.classList.contains('open')) render() });
+document.addEventListener('visibilitychange',()=>{
+  // native drops keep-awake when the app goes to the background; ask again if focus is still running
+  if(!document.hidden&&F.run&&NATIVE) post({type:'awake',on:true});
+  if(!document.hidden&&!sheet.classList.contains('open')) render() });
 
 applyTheme(); render('fade'); setTimeout(scrollToNow,120);
 (()=>{ const sp=document.getElementById('splash'); if(!sp)return; let done=false;
