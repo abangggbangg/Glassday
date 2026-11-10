@@ -1183,13 +1183,16 @@ function drawFocus(){
    <div class="row2"><button class="btn" data-act="f-toggle">${ic(F.run?'pause':'play',18)} ${F.run?'Pause':'Start'}</button><button class="btn ghost" data-act="f-plus">+5 min</button><button class="btn ghost" data-act="f-done">${ic('tick',18)} Done</button></div>`;
 }
 const mmss=s=>`${pad(Math.floor(s/60))}:${pad(Math.floor(s%60))}`;
+// Time left comes from a wall-clock deadline: timers are suspended while the app is in the
+// background, so counting ticks would freeze the countdown.
 function tickFocus(){
-  F.left=Math.max(0,F.left-1);
+  if(!F.run)return;
+  F.left=Math.max(0,Math.round((F.endAt-Date.now())/1000));
   const C=2*Math.PI*110, r=document.getElementById('fring'), tm=document.getElementById('ftime');
   if(r) r.setAttribute('stroke-dashoffset',C*(1-F.left/F.total)); if(tm) tm.textContent=mmss(F.left);
   if(F.left<=0){stopFocus(); buzz([200,100,200]); toast('Time’s up. Nice work!'); drawFocus()}
 }
-async function startFocus(){F.run=true; if(NATIVE)post({type:'awake',on:true}); F.iv=setInterval(tickFocus,1000); try{F.lock=await navigator.wakeLock?.request('screen')}catch(e){} drawFocus()}
+async function startFocus(){F.run=true; F.endAt=Date.now()+F.left*1000; if(NATIVE)post({type:'awake',on:true}); clearInterval(F.iv); F.iv=setInterval(tickFocus,1000); try{F.lock=await navigator.wakeLock?.request('screen')}catch(e){} drawFocus()}
 function stopFocus(){F.run=false; if(NATIVE)post({type:'awake',on:false}); clearInterval(F.iv); try{F.lock&&F.lock.release()}catch(e){} F.lock=null}
 function closeFocus(){stopFocus(); focusEl.classList.remove('open'); NAT.dirty=false}
 
@@ -1332,7 +1335,7 @@ S.settings=Object.assign(S.settings,d.settings||{}); applyTheme(); save(); rende
       catch(err){toast('That doesn’t look like a Glassday backup')} break; }
     case 'f-close': closeFocus(); render(); break;
     case 'f-toggle': F.run?(stopFocus(),drawFocus()):startFocus(); buzz(8); break;
-    case 'f-plus': F.left+=300; F.total+=300; drawFocus(); break;
+    case 'f-plus': F.left+=300; F.total+=300; if(F.run) F.endAt+=300000; drawFocus(); break;
     case 'f-done': { const tk=byId(F.id); if(tk){ if(tk.ext) S.doneN[tk.series+'|'+tk.date]=true; else {const k=tk.date?sel:'inbox'; tk.done={...tk.done,[k]:true}} save()} const b=focusEl.querySelector('.fr'); burst(b,F.color); buzz([10,30,15]); setTimeout(()=>{closeFocus();render()},450); break; }
   }
 });
@@ -1397,7 +1400,7 @@ sheet.addEventListener('focusin',e=>{ const el=e.target; if(!el.matches('input,t
 setInterval(()=>{ if(!sheet.classList.contains('open')&&(view==='timeline'||view==='week')&&sel===today()) render() },30000);
 document.addEventListener('visibilitychange',()=>{
   // native drops keep-awake when the app goes to the background; ask again if focus is still running
-  if(!document.hidden&&F.run&&NATIVE) post({type:'awake',on:true});
+  if(!document.hidden&&F.run){ if(NATIVE) post({type:'awake',on:true}); tickFocus() }
   if(!document.hidden&&!sheet.classList.contains('open')) render() });
 
 applyTheme(); render('fade'); setTimeout(scrollToNow,120);
