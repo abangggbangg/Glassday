@@ -27,6 +27,8 @@ targets:
       path: App/Info.plist
       properties:
         CFBundleDisplayName: Glassday
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         UILaunchScreen:
           UIColorName: LaunchBackground
         UISupportedInterfaceOrientations:
@@ -52,6 +54,8 @@ targets:
       path: Widget/Info.plist
       properties:
         CFBundleDisplayName: Glassday
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         NSCalendarsFullAccessUsageDescription: The Glassday widget shows your Apple Calendar events.
         NSCalendarsUsageDescription: The Glassday widget shows your Apple Calendar events.
         NSExtension:
