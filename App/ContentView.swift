@@ -58,6 +58,10 @@ final class WebModel: NSObject, ObservableObject, WKNavigationDelegate {
 
         bridge.webView = view
         observeKeyboard(view)
+        NotificationCenter.default.addObserver(forName: UIContentSizeCategory.didChangeNotification,
+                                               object: nil, queue: .main) { [weak view] _ in
+            view?.evaluateJavaScript("window.GDtext && GDtext(\(WebModel.textStep()))", completionHandler: nil)
+        }
         if let url = Bundle.main.url(forResource: "index", withExtension: "html") {
             view.loadFileURL(url, allowingReadAccessTo: url.deletingLastPathComponent())
         }
@@ -73,9 +77,29 @@ final class WebModel: NSObject, ObservableObject, WKNavigationDelegate {
         let safe = literal.replacingOccurrences(of: "\u{2028}", with: "\\u2028")
             .replacingOccurrences(of: "\u{2029}", with: "\\u2029")
         controller.addUserScript(WKUserScript(
-            source: "window.GD_NATIVE=true;window.GD_SAVED=\(safe);",
+            source: "window.GD_NATIVE=true;window.GD_TEXT=\(Self.textStep());window.GD_SAVED=\(safe);",
             injectionTime: .atDocumentStart,
             forMainFrameOnly: true))
+    }
+
+    // MARK: Dynamic Type
+
+    /// The page is laid out in fixed CSS px, so it follows the iOS text size by zooming its
+    /// viewport (see GDtext in index.html). This is the zoom step for the current text size;
+    /// the page caps it so its layout never gets narrower than 335 CSS px.
+    static func textStep() -> Double {
+        switch UIApplication.shared.preferredContentSizeCategory {
+        case .extraSmall: return 0.9
+        case .small: return 0.94
+        case .medium: return 0.97
+        case .large: return 1.0
+        case .extraLarge: return 1.05
+        case .extraExtraLarge: return 1.1
+        case .extraExtraExtraLarge: return 1.15
+        case .accessibilityMedium: return 1.2
+        case .accessibilityLarge: return 1.25
+        default: return 1.3   // the larger accessibility sizes
+        }
     }
 
     // MARK: navigation
@@ -105,7 +129,7 @@ final class WebModel: NSObject, ObservableObject, WKNavigationDelegate {
         center.addObserver(forName: UIResponder.keyboardWillChangeFrameNotification, object: nil, queue: .main) { [weak view] note in
             guard let view, let frame = note.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect else { return }
             let local = view.convert(frame, from: nil)
-            let overlap = max(0, view.bounds.maxY - local.minY)
+            let overlap = max(0, view.bounds.maxY - local.minY)   // points; the page converts to CSS px
             view.scrollView.setContentOffset(.zero, animated: false)
             view.evaluateJavaScript("window.GDkb && GDkb(\(Int(overlap)))", completionHandler: nil)
         }

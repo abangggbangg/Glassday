@@ -57,6 +57,7 @@ Glassday is built as a SwiftUI shell around a hand-written HTML/CSS/JS interface
 - **8 theme colours**: Champagne, Rose gold, Emerald, Sapphire, Lavender, Ocean, Sunset and Graphite. Each has its own light and dark version.
 - Spring animations, a confetti burst when you complete a task, swipe gestures and native haptics.
 - Undo for most actions.
+- Follows the iOS **Text Size** setting (up to the largest size that still fits the screen) and **Reduce Motion**.
 
 <p align="center">
   <img src="docs/screenshots/themes.png" alt="Rose gold, Emerald, Sapphire, Lavender and dark Champagne themes" width="100%">
