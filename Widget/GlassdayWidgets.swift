@@ -299,17 +299,23 @@ struct TodayProvider: TimelineProvider {
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<TodayEntry>) -> Void) {
         let now = Date(), all = todayItems()
+        let cal = Calendar.current
+        let midnight = cal.date(byAdding: .day, value: 1, to: cal.startOfDay(for: now)) ?? now.addingTimeInterval(86_400)
         // A new entry each time an event ends, so the list moves on by itself.
-        var times = [now] + all.filter { !$0.allDay && $0.end > now }.map(\.end)
+        var times = [now] + all.filter { !$0.allDay && $0.end > now && $0.end < midnight }.map(\.end)
         times = Array(Set(times)).sorted().prefix(12).map { $0 }
-        let entries = times.map { entry(at: $0, all: all) }
-        let midnight = Calendar.current.startOfDay(for: now).addingTimeInterval(86_400 + 30)
-        completion(Timeline(entries: entries, policy: .after(midnight)))
+        var entries = times.map { entry(at: $0, all: all) }
+        // Turn over to tomorrow (new date, new all-day events) exactly at midnight,
+        // even if WidgetKit runs the next reload late.
+        entries.append(entry(at: midnight, all: todayItems(on: midnight)))
+        completion(Timeline(entries: entries, policy: .after(midnight.addingTimeInterval(60))))
     }
 
-    private func todayItems() -> [CalItem] {
-        let start = Calendar.current.startOfDay(for: Date())
-        return CalData.items(from: start, to: start.addingTimeInterval(86_400)).sorted { $0.start < $1.start }
+    private func todayItems(on day: Date = Date()) -> [CalItem] {
+        let cal = Calendar.current
+        let start = cal.startOfDay(for: day)
+        let end = cal.date(byAdding: .day, value: 1, to: start) ?? start.addingTimeInterval(86_400)
+        return CalData.items(from: start, to: end).sorted { $0.start < $1.start }
     }
 
     private func entry(at date: Date, all: [CalItem]) -> TodayEntry {
