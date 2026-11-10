@@ -19,6 +19,7 @@ final class CalendarBridge: NSObject, WKScriptMessageHandler {
     private var pageReady = false
     private var pendingDay: String?
     private var reloadWork: DispatchWorkItem?
+    private var lastStatus: EKAuthorizationStatus?
     private let cal = Calendar.current
 
     override init() {
@@ -72,7 +73,9 @@ final class CalendarBridge: NSObject, WKScriptMessageHandler {
     /// Tell the page where access stands without ever showing the system prompt.
     /// "ask" means not decided yet: the page explains why before asking (HIG: ask in context).
     private func reportStatus() {
-        switch EKEventStore.authorizationStatus(for: .event) {
+        let status = EKEventStore.authorizationStatus(for: .event)
+        lastStatus = status
+        switch status {
         case .fullAccess: accessGranted()
         case .notDetermined: run("GDN.access('ask')")
         case .writeOnly: run("GDN.access('limited')")   // can add events but not read them
@@ -86,7 +89,8 @@ final class CalendarBridge: NSObject, WKScriptMessageHandler {
         store.requestFullAccessToEvents { [weak self] granted, _ in
             DispatchQueue.main.async {
                 guard let self else { return }
-                if granted { self.store.reset(); self.accessGranted() } else { self.reportStatus() }
+                if granted { self.store.reset() }
+                self.reportStatus()
             }
         }
     }
@@ -103,13 +107,16 @@ final class CalendarBridge: NSObject, WKScriptMessageHandler {
     func pageWillReload() {
         pageReady = false
         range = nil
+        lastStatus = nil
         reloadWork?.cancel()
         UIApplication.shared.isIdleTimerDisabled = false
     }
 
     func appBecameActive() {
-        guard pageReady else { return }
-        reportStatus()   // picks up a permission change made in Settings; never prompts
+        // Only when access changed (e.g. in Settings). Event edits made elsewhere already
+        // arrive through EKEventStoreChanged, so an unchanged status needs no reload.
+        guard pageReady, EKEventStore.authorizationStatus(for: .event) != lastStatus else { return }
+        reportStatus()
     }
 
     @objc private func storeChanged() {
