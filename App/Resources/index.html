@@ -169,6 +169,8 @@ header{padding-block:14px 10px;display:flex;flex-direction:column;gap:12px}
 .now{position:absolute;left:0;right:0;height:0;z-index:3;pointer-events:none}
 .now::before{content:"";position:absolute;left:48px;right:0;border-top:2px solid var(--now);opacity:.75}
 .now::after{content:"";position:absolute;left:44px;top:-5px;width:8px;height:8px;border-radius:50%;background:var(--now)}
+/* inside a live task row, stop the line at the pill so it never strikes through the task text */
+.tl-row .now::before{right:auto;width:68px}
 .now span{position:absolute;left:0;top:-9px;font-size:11.5px;font-weight:800;color:var(--now);font-variant-numeric:tabular-nums}
 .tl-gap{position:relative;display:grid;grid-template-columns:44px 56px minmax(0,1fr);column-gap:12px;min-height:16px;align-items:center}
 .tl-gap.big{min-height:46px}
