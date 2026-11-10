@@ -48,6 +48,9 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;paddin
 input,select,textarea{font:inherit;color:var(--ink)}
 :focus-visible{outline:2px solid var(--accent2);outline-offset:2px;border-radius:10px}
 .num{font-variant-numeric:tabular-nums}
+/* HIG 44pt minimum hit area for small controls, without changing how they look */
+.chk,.cpick,.icon-btn,.date-title button{position:relative}
+.chk::after,.cpick::after,.icon-btn::after,.date-title button::after{content:"";position:absolute;inset:min(0px,calc((100% - 44px) / 2))}
 
 /* ambient blobs */
 .bg{position:fixed;inset:0;z-index:0;overflow:hidden;pointer-events:none}
