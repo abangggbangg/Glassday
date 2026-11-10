@@ -7,19 +7,26 @@ import WidgetKit
 ///
 /// Page → native messages (window.webkit.messageHandlers.gd.postMessage):
 ///   ready, access, load{from,to}, upsert{...}, delete{series,occDate,span},
-///   persist{data}, haptic{style}, awake{on}
-/// Native → page calls: GDN.access, GDN.calendars, GDN.events, GDN.saved, GDN.openDay
+///   persist{data}, haptic{style}, awake{on}, alerts{items}, notify-status, notify-auth
+/// Native → page calls: GDN.access, GDN.calendars, GDN.events, GDN.saved, GDN.openDay, GDN.notify, GDN.notice
 final class CalendarBridge: NSObject, WKScriptMessageHandler {
     static let stateKey = "gd.state"
+    /// Typical state is a few KB; 1 MB is thousands of to-dos.
+    static let maxStateBytes = 1_000_000
 
     let store = EKEventStore()
     weak var webView: WKWebView?
+    /// The page's appearance choice: "light", "dark" or "system".
+    var onScheme: ((String) -> Void)?
 
     private var range: (start: Date, end: Date, from: String, to: String)?
     private var pageReady = false
     private var pendingDay: String?
     private var reloadWork: DispatchWorkItem?
-    private let cal = Calendar.current
+    private var lastStatus: EKAuthorizationStatus?
+    /// Read fresh each time so a time-zone or calendar change while the app is running
+    /// doesn't skew day keys.
+    private var cal: Calendar { Calendar.current }
 
     override init() {
         super.init()
@@ -40,8 +47,20 @@ final class CalendarBridge: NSObject, WKScriptMessageHandler {
         case "ready":
             pageReady = true
             if let day = pendingDay { pendingDay = nil; openDay(day) }
+        case "status":
+            reportStatus()
         case "access":
             requestAccess()
+        case "alerts":
+            Alerts.shared.replace(with: body["items"] as? [[String: Any]] ?? [])
+        case "notify-status":
+            Alerts.shared.status { [weak self] s in self?.run("GDN.notify && GDN.notify(\(self?.json(s) ?? "null"))") }
+        case "notify-auth":
+            Alerts.shared.requestAccess { [weak self] s in self?.run("GDN.notify && GDN.notify(\(self?.json(s) ?? "null"))") }
+        case "scheme":
+            onScheme?(body["mode"] as? String ?? "system")
+        case "settings":
+            if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
         case "load":
             if let from = body["from"] as? String, let to = body["to"] as? String,
                let a = date(from), let b = date(to), let end = cal.date(byAdding: .day, value: 1, to: b) {
@@ -53,7 +72,13 @@ final class CalendarBridge: NSObject, WKScriptMessageHandler {
         case "delete":
             delete(body)
         case "persist":
-            if let data = body["data"] as? String { UserDefaults.standard.set(data, forKey: Self.stateKey) }
+            guard let data = body["data"] as? String else { break }
+            // UserDefaults is read in full at launch; refuse runaway blobs instead of slowing every start.
+            if data.utf8.count > Self.maxStateBytes {
+                run("GDN.notice && GDN.notice(\(json("Too much data to save on this phone. Remove some old to-dos, or copy a backup in Settings.")))")
+            } else {
+                UserDefaults.standard.set(data, forKey: Self.stateKey)
+            }
         case "haptic":
             haptic(body["style"] as? String)
         case "awake":
@@ -65,19 +90,28 @@ final class CalendarBridge: NSObject, WKScriptMessageHandler {
 
     // MARK: access
 
+    /// Tell the page where access stands without ever showing the system prompt.
+    /// "ask" means not decided yet: the page explains why before asking (HIG: ask in context).
+    private func reportStatus() {
+        let status = EKEventStore.authorizationStatus(for: .event)
+        lastStatus = status
+        switch status {
+        case .fullAccess: accessGranted()
+        case .notDetermined: run("GDN.access('ask')")
+        case .writeOnly: run("GDN.access('limited')")   // can add events but not read them
+        default: run("GDN.access('denied')")
+        }
+    }
+
+    /// Only called when the person taps Connect on the page.
     private func requestAccess() {
-        switch EKEventStore.authorizationStatus(for: .event) {
-        case .fullAccess:
-            accessGranted()
-        case .notDetermined:
-            store.requestFullAccessToEvents { [weak self] granted, _ in
-                DispatchQueue.main.async {
-                    guard let self else { return }
-                    if granted { self.store.reset(); self.accessGranted() } else { self.run("GDN.access('denied')") }
-                }
+        guard EKEventStore.authorizationStatus(for: .event) == .notDetermined else { return reportStatus() }
+        store.requestFullAccessToEvents { [weak self] granted, _ in
+            DispatchQueue.main.async {
+                guard let self else { return }
+                if granted { self.store.reset() }
+                self.reportStatus()
             }
-        default:
-            run("GDN.access('denied')")
         }
     }
 
@@ -88,9 +122,21 @@ final class CalendarBridge: NSObject, WKScriptMessageHandler {
         WidgetCenter.shared.reloadAllTimelines()
     }
 
+    /// The web view is about to reload (content process died). Forget page state and
+    /// never leave the screen pinned awake by a page that no longer exists.
+    func pageWillReload() {
+        pageReady = false
+        range = nil
+        lastStatus = nil
+        reloadWork?.cancel()
+        UIApplication.shared.isIdleTimerDisabled = false
+    }
+
     func appBecameActive() {
-        guard pageReady else { return }
-        requestAccess()   // picks up a permission change made in Settings
+        // Only when access changed (e.g. in Settings). Event edits made elsewhere already
+        // arrive through EKEventStoreChanged, so an unchanged status needs no reload.
+        guard pageReady, EKEventStore.authorizationStatus(for: .event) != lastStatus else { return }
+        reportStatus()
     }
 
     @objc private func storeChanged() {
@@ -135,8 +181,12 @@ final class CalendarBridge: NSObject, WKScriptMessageHandler {
                 "cal": e.calendar.title,
                 "calId": e.calendar.calendarIdentifier,
                 "notes": e.notes ?? "",
+                "location": e.location ?? "",
                 "editable": e.calendar.allowsContentModifications,
-                "rep": repeatName(e)
+                "rep": repeatName(e),
+                // Apple Calendar alerts as minutes before the start (absolute-date alarms are left alone)
+                "alerts": (e.alarms ?? []).filter { $0.absoluteDate == nil }
+                    .map { max(0, Int((-$0.relativeOffset / 60).rounded())) }.sorted()
             ]
             item["endDate"] = key(end.addingTimeInterval(-1))
             if !e.isAllDay {
@@ -158,6 +208,8 @@ final class CalendarBridge: NSObject, WKScriptMessageHandler {
             if days == Set(2...6) { return "weekdays" }
             if days.count <= 1 { return "weekly" }
             return "custom"
+        case .weekly where rule.interval == 2 && (rule.daysOfTheWeek ?? []).count <= 1:
+            return "biweekly"
         case .monthly where rule.interval == 1 && (rule.daysOfTheWeek ?? []).isEmpty:
             return "monthly"
         case .yearly where rule.interval == 1:
@@ -200,8 +252,13 @@ final class CalendarBridge: NSObject, WKScriptMessageHandler {
 
         var event: EKEvent
         var span: EKSpan = .thisEvent
-        if let series = b["series"] as? String, let occ = b["occDate"] as? String,
-           let existing = occurrence(series, on: occ) {
+        if let series = b["series"] as? String {
+            // Editing an existing event. If it can't be found (changed or deleted in Calendar
+            // since we loaded), never fall through to creating a duplicate.
+            guard let occ = b["occDate"] as? String, let existing = occurrence(series, on: occ) else {
+                scheduleReload()
+                return reply(req, nil, "It was changed or removed in Apple Calendar, so nothing was saved")
+            }
             event = existing
             if existing.hasRecurrenceRules { span = .futureEvents }
         } else {
@@ -220,9 +277,16 @@ final class CalendarBridge: NSObject, WKScriptMessageHandler {
         event.startDate = start
         event.endDate = finish
         if let notes = b["notes"] as? String { event.notes = notes.isEmpty ? nil : notes }
+        if let place = b["location"] as? String { event.location = place.isEmpty ? nil : place }
 
         if let rep = b["repeat"] as? String, rep != "custom" {
             event.recurrenceRules = rule(for: rep).map { [$0] }
+        }
+        // Alerts are real Calendar alarms, so iOS shows them (title, time, location) even when
+        // Glassday isn't running, and they match the Calendar app. Sent only when the person
+        // changed them, so alarms Glassday doesn't show (a third alert, say) are kept otherwise.
+        if let minutes = b["alerts"] as? [NSNumber] {
+            event.alarms = minutes.map { EKAlarm(relativeOffset: -TimeInterval($0.intValue * 60)) }
         }
 
         do {
@@ -235,20 +299,33 @@ final class CalendarBridge: NSObject, WKScriptMessageHandler {
     }
 
     /// span: "one" = this occurrence, "future" = this and later, "all" = the whole series
+    /// Failures are reported back (GDN.saved("delete", "", error)) so the page never claims a
+    /// delete that didn't happen; the reload that always follows restores the true state.
     private func delete(_ b: [String: Any]) {
-        guard hasAccess, let series = b["series"] as? String else { scheduleReload(); return }
+        defer { scheduleReload() }
+        guard hasAccess else { return reply("delete", nil, "Calendar access is off") }
+        guard let series = b["series"] as? String else { return reply("delete", nil, "Missing event") }
         let span = b["span"] as? String ?? "one"
+
+        let target: EKEvent?
+        let ekSpan: EKSpan
+        if span == "all" {
+            // For a repeating event this returns the first occurrence, so .futureEvents removes
+            // every repeat (daily, weekly, monthly and yearly rules alike).
+            target = store.calendarItem(withIdentifier: series) as? EKEvent
+            ekSpan = .futureEvents
+        } else {
+            target = (b["occDate"] as? String).flatMap { occurrence(series, on: $0) }
+            ekSpan = span == "one" ? .thisEvent : .futureEvents
+        }
+        guard let event = target else {
+            return reply("delete", nil, "It was already changed or removed in Apple Calendar")
+        }
         do {
-            if span == "all", let first = store.calendarItem(withIdentifier: series) as? EKEvent {
-                // For a repeating event this is the first occurrence, so "future" removes every repeat.
-                try store.remove(first, span: .futureEvents, commit: true)
-            } else if let occ = b["occDate"] as? String, let event = occurrence(series, on: occ) {
-                try store.remove(event, span: span == "one" ? .thisEvent : .futureEvents, commit: true)
-            }
+            try store.remove(event, span: ekSpan, commit: true)
         } catch {
             reply("delete", nil, error.localizedDescription)
         }
-        scheduleReload()
     }
 
     private func rule(for name: String) -> EKRecurrenceRule? {
@@ -257,6 +334,8 @@ final class CalendarBridge: NSObject, WKScriptMessageHandler {
             return EKRecurrenceRule(recurrenceWith: .daily, interval: 1, end: nil)
         case "weekly":
             return EKRecurrenceRule(recurrenceWith: .weekly, interval: 1, end: nil)
+        case "biweekly":
+            return EKRecurrenceRule(recurrenceWith: .weekly, interval: 2, end: nil)
         case "monthly":
             return EKRecurrenceRule(recurrenceWith: .monthly, interval: 1, end: nil)
         case "yearly":
@@ -278,7 +357,9 @@ final class CalendarBridge: NSObject, WKScriptMessageHandler {
     // MARK: misc
 
     func openDay(_ day: String) {
-        guard day.range(of: #"^\d{4}-\d{2}-\d{2}$"#, options: .regularExpression) != nil else { return }
+        // Shape check, then a real-date check: 2026-13-45 must not reach the page.
+        guard day.range(of: #"^\d{4}-\d{2}-\d{2}$"#, options: .regularExpression) != nil,
+              let d = date(day), key(d) == day else { return }
         if pageReady { run("GDN.openDay(\(json(day)))") } else { pendingDay = day }
     }
 
@@ -314,15 +395,19 @@ final class CalendarBridge: NSObject, WKScriptMessageHandler {
         return String(format: "#%02X%02X%02X", Int(r * 255), Int(g * 255), Int(b * 255))
     }
 
+    /// A JS literal for any value. Every path escapes U+2028/U+2029 (line terminators in pre-ES2019 JS).
     private func json(_ value: Any) -> String {
+        let jsSafe = { (s: String) in
+            s.replacingOccurrences(of: "\u{2028}", with: "\\u2028").replacingOccurrences(of: "\u{2029}", with: "\\u2029")
+        }
         if let s = value as? String {
             let data = (try? JSONSerialization.data(withJSONObject: [s])) ?? Data("[\"\"]".utf8)
             let arr = String(data: data, encoding: .utf8) ?? "[\"\"]"
-            return String(arr.dropFirst().dropLast()).replacingOccurrences(of: "\u{2028}", with: "\\u2028")
+            return jsSafe(String(arr.dropFirst().dropLast()))
         }
         guard JSONSerialization.isValidJSONObject(value),
               let data = try? JSONSerialization.data(withJSONObject: value),
               let s = String(data: data, encoding: .utf8) else { return "null" }
-        return s.replacingOccurrences(of: "\u{2028}", with: "\\u2028").replacingOccurrences(of: "\u{2029}", with: "\\u2029")
+        return jsSafe(s)
     }
 }

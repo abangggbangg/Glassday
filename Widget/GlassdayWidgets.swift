@@ -4,9 +4,20 @@ import WidgetKit
 
 // MARK: - Shared
 
+/// Light / dark pairs chosen to pass WCAG AA (4.5:1) as text on the widget background.
+/// (Following the app's selected theme needs an App Group; see REVIEW.md P3-1.)
 enum Palette {
-    static let gold = Color(red: 0.66, green: 0.51, blue: 0.31)
-    static let sunday = Color(red: 0.86, green: 0.29, blue: 0.27)
+    static let gold = adaptive(light: 0x8E6F42, dark: 0xD2B07A)     // 4.6:1 on white, 8.7:1 on dark
+    static let onGold = adaptive(light: 0xFFFFFF, dark: 0x16130D)   // text on a gold fill
+    static let sunday = adaptive(light: 0xC23B36, dark: 0xE0675E)
+
+    private static func adaptive(light: UInt32, dark: UInt32) -> Color {
+        Color(UIColor { $0.userInterfaceStyle == .dark ? rgb(dark) : rgb(light) })
+    }
+    private static func rgb(_ v: UInt32) -> UIColor {
+        UIColor(red: CGFloat(v >> 16 & 0xFF) / 255, green: CGFloat(v >> 8 & 0xFF) / 255,
+                blue: CGFloat(v & 0xFF) / 255, alpha: 1)
+    }
 }
 
 struct CalItem {
@@ -20,9 +31,13 @@ struct CalItem {
 enum CalData {
     static var authorized: Bool { EKEventStore.authorizationStatus(for: .event) == .fullAccess }
 
+    /// One store per widget process: EKEventStore is expensive to create, and rebuilding the
+    /// month grid itself (at most 42 cells, about once an hour) is cheap, so this is the only cache
+    /// worth having. Lazily created on first use, which only happens once access is granted.
+    private static let store = EKEventStore()
+
     static func items(from start: Date, to end: Date) -> [CalItem] {
         guard authorized else { return [] }
-        let store = EKEventStore()
         let pred = store.predicateForEvents(withStart: start, end: end, calendars: nil)
         return store.events(matching: pred).compactMap { e in
             guard let s = e.startDate, let en = e.endDate else { return nil }
@@ -54,13 +69,16 @@ struct NeedAccessView: View {
             Image(systemName: "calendar.badge.exclamationmark")
                 .font(.system(size: 28, weight: .semibold))
                 .foregroundStyle(Palette.gold)
-            Text("Open Glassday and allow calendar access")
+            // The whole widget opens the app (widgetURL), where the Connect card is.
+            Text("Tap to connect Apple Calendar")
                 .font(.system(size: 13, weight: .semibold, design: .rounded))
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
         }
         .padding()
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Glassday needs calendar access. Opens Glassday to connect Apple Calendar.")
     }
 }
 
@@ -202,7 +220,7 @@ struct DayCellView: View {
             VStack(spacing: 1.5) {
                 Text("\(day.number)")
                     .font(.system(size: 12, weight: .bold, design: .rounded))
-                    .foregroundStyle(day.isToday ? Color.white : (day.isSunday ? Palette.sunday : Color.primary))
+                    .foregroundStyle(day.isToday ? Palette.onGold : (day.isSunday ? Palette.sunday : Color.primary))
                     .frame(width: 21, height: 17)
                     .background { if day.isToday { Capsule().fill(Palette.gold) } }
 
@@ -234,6 +252,21 @@ struct DayCellView: View {
             .background(RoundedRectangle(cornerRadius: 7).fill(day.isToday ? Palette.gold.opacity(0.12) : Color.clear))
             .opacity(day.inMonth ? 1 : 0.35)
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(accessibilityText)
+        .accessibilityHint("Opens this day in Glassday")
+    }
+
+    /// "Tuesday 10 November, today, 3 events: Lecture, Lab, Gym"
+    private var accessibilityText: String {
+        var parts = [day.date.formatted(.dateTime.weekday(.wide).day().month(.wide))]
+        if day.isToday { parts.append("today") }
+        switch day.items.count {
+        case 0: parts.append("no events")
+        case 1: parts.append("1 event: \(day.items[0].title)")
+        default: parts.append("\(day.items.count) events: " + day.items.prefix(4).map(\.title).joined(separator: ", "))
+        }
+        return parts.joined(separator: ", ")
     }
 }
 
@@ -242,6 +275,8 @@ struct MonthWidget: Widget {
         StaticConfiguration(kind: "GlassdayMonth", provider: MonthProvider()) { entry in
             MonthWidgetView(entry: entry)
                 .containerBackground(for: .widget) { WidgetBackground() }
+                // Day cells link to their own day; anywhere else (title, or the no-access state) opens today.
+                .widgetURL(URL(string: "glassday://day/\(CalData.dayKey(entry.date))"))
         }
         .configurationDisplayName("Month")
         .description("Your whole month with Apple Calendar events. Tap a day to open it.")
@@ -268,17 +303,23 @@ struct TodayProvider: TimelineProvider {
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<TodayEntry>) -> Void) {
         let now = Date(), all = todayItems()
+        let cal = Calendar.current
+        let midnight = cal.date(byAdding: .day, value: 1, to: cal.startOfDay(for: now)) ?? now.addingTimeInterval(86_400)
         // A new entry each time an event ends, so the list moves on by itself.
-        var times = [now] + all.filter { !$0.allDay && $0.end > now }.map(\.end)
+        var times = [now] + all.filter { !$0.allDay && $0.end > now && $0.end < midnight }.map(\.end)
         times = Array(Set(times)).sorted().prefix(12).map { $0 }
-        let entries = times.map { entry(at: $0, all: all) }
-        let midnight = Calendar.current.startOfDay(for: now).addingTimeInterval(86_400 + 30)
-        completion(Timeline(entries: entries, policy: .after(midnight)))
+        var entries = times.map { entry(at: $0, all: all) }
+        // Turn over to tomorrow (new date, new all-day events) exactly at midnight,
+        // even if WidgetKit runs the next reload late.
+        entries.append(entry(at: midnight, all: todayItems(on: midnight)))
+        completion(Timeline(entries: entries, policy: .after(midnight.addingTimeInterval(60))))
     }
 
-    private func todayItems() -> [CalItem] {
-        let start = Calendar.current.startOfDay(for: Date())
-        return CalData.items(from: start, to: start.addingTimeInterval(86_400)).sorted { $0.start < $1.start }
+    private func todayItems(on day: Date = Date()) -> [CalItem] {
+        let cal = Calendar.current
+        let start = cal.startOfDay(for: day)
+        let end = cal.date(byAdding: .day, value: 1, to: start) ?? start.addingTimeInterval(86_400)
+        return CalData.items(from: start, to: end).sorted { $0.start < $1.start }
     }
 
     private func entry(at date: Date, all: [CalItem]) -> TodayEntry {
@@ -398,6 +439,10 @@ struct TodayWidgetView: View {
             }
         }
         .frame(height: compact ? 34 : 32)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(live
+            ? "\(item.title), now, ends \(item.end.formatted(date: .omitted, time: .shortened))"
+            : "\(item.title), \(item.start.formatted(date: .omitted, time: .shortened)) to \(item.end.formatted(date: .omitted, time: .shortened))")
     }
 }
 

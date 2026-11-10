@@ -24,7 +24,7 @@ Glassday is built as a SwiftUI shell around a hand-written HTML/CSS/JS interface
 - **Inbox**: to-dos with no time yet. Your top inbox items also appear as quick bubbles at the top of the Timeline.
 - **Overdue**: missed tasks are collected with a one-tap *Move to today*.
 - **All-day and multi-day events**: holidays, trips and deadlines sit in their own strip at the top of the Timeline, and as spanning bars at the top of Week and Month. They never overlap timed tasks. Type `Penang trip Fri to Sun` or `Hackathon 12/11 to 14/11` and Glassday makes it all-day.
-- **Repeating tasks**: every day, weekdays, every week, every month or every year. Deleting a repeat asks whether to remove **this one only**, **this and all future ones**, or **all of them**.
+- **Repeating tasks**: a Calendar-style Repeat menu with every day, every weekday, every week, every 2 weeks, every month or every year (or type `every 2 weeks`). Deleting a repeat asks whether to remove **this one only**, **this and all future ones**, or **all of them**.
 - **Overlap warnings** when you schedule over another task.
 
 ### Phone-friendly task editor
@@ -43,6 +43,12 @@ Glassday is built as a SwiftUI shell around a hand-written HTML/CSS/JS interface
 - **Plan my day**: fits your inbox to-dos into free gaps, with 10-minute breaks between them.
 - **Insights**: planned vs free time, your longest focus window, a completion streak, and a week-load chart.
 
+### Alerts
+- Works like Apple Calendar: **Alert** and **Second Alert** pop-up menus (None, At time of event, 5, 10, 15 or 30 minutes, 1 or 2 hours, 1 or 2 days, or 1 week before), plus a **Location** field (for example the classroom).
+- For Apple Calendar events, alerts are saved as the event's own alarms. iOS shows them (title, time and location) even if Glassday hasn't been opened, and they match the Calendar app both ways.
+- Tasks kept only in Glassday (when Calendar access is off) get Glassday's own notifications for the next 7 days: **`Physics class 09:00`** with the location underneath. Glassday asks for notification permission the first time you set one. Tapping it opens that day.
+- Type it in one go: `Physics tomorrow 9am @ Room 3.12`. Everything after `@` becomes the location.
+
 ### Focus
 - Tap any task's icon to start a **focus timer** with a countdown ring.
 - The screen stays awake while the timer runs.
@@ -57,6 +63,7 @@ Glassday is built as a SwiftUI shell around a hand-written HTML/CSS/JS interface
 - **8 theme colours**: Champagne, Rose gold, Emerald, Sapphire, Lavender, Ocean, Sunset and Graphite. Each has its own light and dark version.
 - Spring animations, a confetti burst when you complete a task, swipe gestures and native haptics.
 - Undo for most actions.
+- Follows the iOS **Text Size** setting (up to the largest size that still fits the screen) and **Reduce Motion**.
 
 <p align="center">
   <img src="docs/screenshots/themes.png" alt="Rose gold, Emerald, Sapphire, Lavender and dark Champagne themes" width="100%">
@@ -68,8 +75,9 @@ Glassday is built as a SwiftUI shell around a hand-written HTML/CSS/JS interface
   - Scheduled tasks are real calendar events.
   - Changes made in Apple Calendar, or in Google/Outlook accounts added to iOS, appear in Glassday instantly.
 - **Widgets**:
-  - **Month** (large): Sunday-first month grid with event bars. Tap a day to open it in the app.
+  - **Month** (large): Sunday-first month grid with event bars. Tap a day to open it in the app; tap the title to open today.
   - **Today** (small / medium): what's next today.
+  - Without calendar access, both widgets show *Tap to connect Apple Calendar* and open the app when tapped.
 - **Deep links**: `glassday://day/YYYY-MM-DD` opens a specific day.
 
 ---
@@ -99,6 +107,7 @@ Glassday/
 │   ├── GlassdayApp.swift       # App entry point
 │   ├── ContentView.swift       # WKWebView host, deep links, keyboard handling
 │   ├── CalendarBridge.swift    # JS ⇄ EventKit bridge, haptics, persistence
+│   ├── Alerts.swift            # Task alerts (local notifications)
 │   ├── Resources/
 │   │   └── index.html          # The whole Glassday interface
 │   └── Assets.xcassets/        # App icon
@@ -138,16 +147,20 @@ Glassday/
 | `type` | Payload | Purpose |
 |---|---|---|
 | `ready` | | Page loaded; flush any pending deep link |
-| `access` | | Request or confirm calendar access |
+| `status` | | Report calendar access without prompting (`GDN.access('ask' / 'granted' / 'denied')`) |
+| `access` | | Show the system calendar prompt (only after the person taps Connect) |
 | `load` | `from`, `to` (YYYY-MM-DD) | Fetch events in a date window |
-| `upsert` | `reqId`, `series?`, `occDate?`, `title`, `date`, `start`, `dur`, `repeat`, `notes`, `calId` | Create or update an event |
+| `upsert` | `reqId`, `series?`, `occDate?`, `title`, `date`, `start`, `dur`, `repeat`, `notes`, `location`, `alerts?` (minutes before; only when changed), `calId` | Create or update an event |
 | `delete` | `series`, `occDate`, `span` (`one`/`future`) | Remove an event |
-| `persist` | `data` (JSON string) | Save app-only state |
+| `settings` | | Open Glassday's page in iOS Settings (shown when access is off or add-only) |
+| `persist` | `data` (JSON string) | Save app-only state (refused above 1 MB) |
+| `alerts` | `items` [{`id`, `title`, `body`, `at` (ms), `day`}] | Replace the pending alerts for Glassday-only tasks (next 7 days, max 60) |
+| `notify-status` / `notify-auth` | | Report / request notification permission (`GDN.notify`) |
 | `haptic` | `style` (`light`/`medium`/`success`) | Haptic feedback |
 | `awake` | `on` | Keep the screen awake during focus |
 
 ### Native → page callbacks
-`GDN.access(status)`, `GDN.calendars(list, defaultId)`, `GDN.events(list, from, to)`, `GDN.saved(reqId, id, error)`, `GDN.openDay(key)`, `GDkb(keyboardHeight)`
+`GDN.access(status)` (`ask`, `granted`, `limited`, `denied`), `GDN.calendars(list, defaultId)`, `GDN.events(list, from, to)`, `GDN.saved(reqId, id, error)`, `GDN.openDay(key)`, `GDN.notify(status)`, `GDN.notice(message)`, `GDkb(keyboardHeight)`, `GDtext(zoomStep)`
 
 ### Rules for recurring and read-only events
 - Edits to a recurring event apply to **this and future** occurrences.
@@ -191,7 +204,7 @@ open Glassday.xcodeproj
 4. On your iPhone, turn on **Settings → Privacy & Security → Developer Mode** and restart when asked.
 5. Plug in your phone, select it as the run destination, and press **▶ Run**.
 6. If prompted, go to **Settings → General → VPN & Device Management** on the phone and trust your developer profile.
-7. Open Glassday and allow **Full Access** to Calendar.
+7. Open Glassday, tap **Connect** on the *Connect Apple Calendar* card, and allow **Full Access**. (Glassday never asks on launch; you can also connect later from **Settings → Apple Calendar**.)
 8. Add the widget: long-press the home screen, then **Edit → Add Widget → Glassday**.
 
 > **Free Apple ID:** apps signed with a free account expire after **7 days**. Re-run from Xcode to renew; your data stays. To renew automatically instead, use the free Sideloadly method below.
@@ -203,7 +216,7 @@ This keeps Apple Calendar sync and the widgets, costs nothing, and renews the ap
    ```bash
    ./build-ipa.sh
    ```
-   This creates `Glassday.ipa` with the app and widget inside.
+   This creates `Glassday.ipa` with the app and widget inside. If the widget didn't build, the script stops with an error instead of making an app without widgets. (`make-ipa.sh` still works and simply runs `build-ipa.sh`.)
 2. Install [Sideloadly](https://sideloadly.io) on your Mac. The first time, open it with right-click → **Open**.
 3. Plug in your iPhone, unlock it, and tap **Trust**. In Finder, select the iPhone, tick **Show this iPhone when on Wi-Fi**, and click **Apply**.
 4. In Sideloadly:
@@ -233,7 +246,7 @@ The whole interface is in `App/Resources/index.html`. You can open it directly i
 ## Roadmap ideas
 - [ ] Widget follows the selected theme colour (via an App Group)
 - [ ] Apple Reminders sync for inbox to-dos
-- [ ] Notifications before tasks start
+- [x] Alerts before tasks start, with location
 - [ ] Interactive widget checkboxes (iOS 17 App Intents)
 - [ ] Bundle fonts locally for full offline use
 - [x] Start/end times and a duration scroll wheel

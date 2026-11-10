@@ -14,7 +14,13 @@ xcodebuild -project Glassday.xcodeproj -scheme Glassday -configuration Release \
   build -quiet
 
 APP="build/Build/Products/Release-iphoneos/Glassday.app"
-[ -d "$APP/PlugIns/GlassdayWidget.appex" ] || echo "Warning: widget not found inside the app"
+APPEX="$APP/PlugIns/GlassdayWidget.appex"
+[ -x "$APP/Glassday" ] || { echo "Error: the app binary is missing from $APP" >&2; exit 1; }
+if [ ! -d "$APPEX" ] || [ ! -x "$APPEX/GlassdayWidget" ] || [ ! -f "$APPEX/Info.plist" ]; then
+  echo "Error: the widget (GlassdayWidget.appex) is missing or incomplete inside the app." >&2
+  echo "Not creating Glassday.ipa. Check the GlassdayWidget target built, then run this again." >&2
+  exit 1
+fi
 
 rm -rf Payload Glassday.ipa
 mkdir Payload
