@@ -168,14 +168,19 @@ header{padding-block:14px 10px;display:flex;flex-direction:column;gap:12px}
 .wk-adb{position:relative;flex:1;min-width:0}
 .wbar{position:absolute;height:18px;border-radius:6px;background:var(--c);color:#fff;font-size:10px;font-weight:700;padding:0 6px;line-height:18px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:left;
   box-shadow:0 3px 8px color-mix(in srgb,var(--c) 35%,transparent);animation:fadeUp .4s cubic-bezier(.2,.8,.2,1) both}
-.wk-head div{text-align:center;font-size:11px;color:var(--ink3);font-weight:600;display:flex;flex-direction:column;gap:2px;align-items:center}
+.wk-head>*{text-align:center;padding:2px 0;border-radius:12px;transition:background .3s;font-size:11px;color:var(--ink3);font-weight:600;display:flex;flex-direction:column;gap:2px;align-items:center}
 .wk-head b{font-family:var(--f-display);font-size:15px;color:var(--ink);width:26px;height:26px;display:grid;place-items:center;border-radius:50%}
 .wk-head .t b{background:var(--accent);color:var(--on-accent)}
+.wk-head .s{background:color-mix(in srgb,var(--accent) 16%,transparent)}
+.wk-head .s span{color:var(--accent);font-weight:800}
+.wk-head .s:not(.t) b{box-shadow:0 0 0 2px var(--accent);color:var(--accent)}
 .wk-body{display:grid;grid-template-columns:34px repeat(7,minmax(0,1fr));gap:2px;position:relative}
 .wk-hours{position:relative}
 .wk-hours span{position:absolute;right:4px;font-size:10px;color:var(--ink3);transform:translateY(-50%);font-variant-numeric:tabular-nums}
 .wk-col{position:relative;border-radius:10px;cursor:copy}
 .wk-col.t{background:var(--glass-soft)}
+.wk-col.s{background:color-mix(in srgb,var(--accent) 12%,transparent);box-shadow:inset 0 0 0 1.5px color-mix(in srgb,var(--accent) 50%,transparent);animation:colPick .55s cubic-bezier(.2,.8,.2,1)}
+@keyframes colPick{from{background:color-mix(in srgb,var(--accent) 32%,transparent);box-shadow:inset 0 0 0 3px var(--accent)}}
 .wk-lines{position:absolute;left:34px;right:0;top:0;pointer-events:none}
 .wk-lines i{position:absolute;left:0;right:0;border-top:1px solid var(--hair)}
 .wb{position:absolute;border-radius:8px;padding:4px 5px;font-size:10.5px;font-weight:700;line-height:1.15;color:#fff;background:var(--c);overflow:hidden;text-align:left;
@@ -773,7 +778,7 @@ function vWeek(){
   let n=0;
   for(let i=0;i<7;i++){
     const k=addD(ws,i), d=pd(k), isT=k===T;
-    head+=`<div class="${isT?'t':''}"><span>${DN[d.getDay()]}</span><b class="num">${d.getDate()}</b></div>`;
+    head+=`<button class="${isT?'t':''} ${k===sel?'s':''}" data-act="day" data-k="${k}" aria-label="${DN[d.getDay()]} ${d.getDate()}" aria-pressed="${k===sel}"><span>${DN[d.getDay()]}</span><b class="num">${d.getDate()}</b></button>`;
     const ts=dayTasks(k).filter(t=>t.start+t.dur>ds*60&&t.start<de*60);
     const lanes=[]; const pos=ts.map(t=>{let l=lanes.findIndex(e=>e<=t.start); if(l<0){l=lanes.length;lanes.push(0)} lanes[l]=t.start+t.dur; return l});
     const L=Math.max(1,lanes.length);
@@ -782,7 +787,7 @@ function vWeek(){
       return `<button class="wb ${isDone(t,k)?'done':''}" data-act="edit" data-id="${t.id}" data-k="${k}" style="--c:${t.color};--n:${n++};top:${top}px;height:${hh}px;left:${pos[j]/L*100}%;width:calc(${100/L}% - 2px)">${esc(t.title)}${hh>34?`<small>${fT(t.start)}</small>`:''}</button>`;
     }).join('');
     const nm=nowM(); const nl=isT&&nm>=ds*60&&nm<=de*60?`<div class="wk-now" style="top:${(nm-ds*60)/60*H}px"></div>`:'';
-    cols+=`<div class="wk-col ${isT?'t':''}" data-act="wkslot" data-k="${k}" style="height:${gh}px">${blocks}${nl}</div>`;
+    cols+=`<div class="wk-col ${isT?'t':''} ${k===sel?'s':''}" data-act="wkslot" data-k="${k}" style="height:${gh}px">${blocks}${nl}</div>`;
   }
   const segs=packSegs(ws,addD(ws,6)), AL=segs.reduce((x,s)=>Math.max(x,s.lane+1),0);
   const adRow=AL?`<div class="wk-ad"><span class="wk-adl">All day</span><div class="wk-adb" style="height:${AL*21}px">${segs.map(s=>`<button class="wbar ${s.cs?'cs':''} ${s.ce?'ce':''} ${isDone(s.a,s.a.date)?'done':''}" data-act="edit" data-id="${s.a.id}" style="--c:${s.a.color};left:calc(${s.c0} * (100% + 2px) / 7);width:calc(${s.c1-s.c0+1} * (100% + 2px) / 7 - 2px);top:${s.lane*21}px">${esc(s.a.title)}</button>`).join('')}</div></div>`:'';
@@ -927,7 +932,9 @@ function calStep(n){
   else if(calMode==='month') setDay(dk(new Date(d.getFullYear(),d.getMonth()+n,1)));
   else setDay(addD(sel,7*n));
 }
-function setDay(k){ if(k===sel)return; lastDir=k>sel?'slide-l':'slide-r'; sel=k; render(lastDir); buzz(6) }
+function setDay(k){ if(k===sel)return; lastDir=k>sel?'slide-l':'slide-r';
+  const sameWeek=view==='week'&&calMode==='week'&&weekStart(k)===weekStart(sel), v=document.getElementById('view'), y=v.scrollTop;
+  sel=k; render(sameWeek?null:lastDir); if(sameWeek) v.scrollTop=y; buzz(6) }
 function scrollToNow(){
   const v=document.getElementById('view');
   if(view==='week'&&calMode==='week'){const H=46, y=(Math.max(nowM()/60,S.settings.dayStart+1)-S.settings.dayStart-1.5)*H; v.scrollTop=Math.max(0,y)}
