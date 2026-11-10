@@ -26,7 +26,8 @@ img{max-width:100%}
 </style>
 <title>Glassday Planner</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,650;12..96,800&family=Manrope:wght@400;500;600;700&display=swap">
+<!-- Non-blocking: first paint never waits on the network; the system fallback fonts show until these arrive (or forever, offline). -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,650;12..96,800&family=Manrope:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
 <style>
 /* Layout: one-screen phone app — glass header + week strip, scrolling glass card for the active view, floating glass dock with FAB. */
 :root{
