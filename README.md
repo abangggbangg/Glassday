@@ -43,6 +43,13 @@ Glassday is built as a SwiftUI shell around a hand-written HTML/CSS/JS interface
 - **Plan my day**: fits your inbox to-dos into free gaps, with 10-minute breaks between them.
 - **Insights**: planned vs free time, your longest focus window, a completion streak, and a week-load chart.
 
+### Alerts
+- Give any timed task an **Alert**: at the start, or 5, 10, 15 or 30 minutes before. It's off unless you turn it on.
+- Add a **Location** (for example the classroom). The notification reads **`Physics class 09:00`** with the location underneath; without a location it says *Starting now* or *In 10 min*.
+- Type it in one go: `Physics tomorrow 9am @ Room 3.12`. Everything after `@` becomes the location.
+- Glassday asks for notification permission the first time you turn an alert on. Tapping an alert opens that day.
+- Alerts for the next 7 days are scheduled whenever you open or change Glassday, so open it at least once a week. For Apple Calendar events, the location is saved in the event and the alert choice stays in Glassday (like icons).
+
 ### Focus
 - Tap any task's icon to start a **focus timer** with a countdown ring.
 - The screen stays awake while the timer runs.
@@ -101,6 +108,7 @@ Glassday/
 │   ├── GlassdayApp.swift       # App entry point
 │   ├── ContentView.swift       # WKWebView host, deep links, keyboard handling
 │   ├── CalendarBridge.swift    # JS ⇄ EventKit bridge, haptics, persistence
+│   ├── Alerts.swift            # Task alerts (local notifications)
 │   ├── Resources/
 │   │   └── index.html          # The whole Glassday interface
 │   └── Assets.xcassets/        # App icon
@@ -143,15 +151,17 @@ Glassday/
 | `status` | | Report calendar access without prompting (`GDN.access('ask' / 'granted' / 'denied')`) |
 | `access` | | Show the system calendar prompt (only after the person taps Connect) |
 | `load` | `from`, `to` (YYYY-MM-DD) | Fetch events in a date window |
-| `upsert` | `reqId`, `series?`, `occDate?`, `title`, `date`, `start`, `dur`, `repeat`, `notes`, `calId` | Create or update an event |
+| `upsert` | `reqId`, `series?`, `occDate?`, `title`, `date`, `start`, `dur`, `repeat`, `notes`, `location`, `calId` | Create or update an event |
 | `delete` | `series`, `occDate`, `span` (`one`/`future`) | Remove an event |
 | `settings` | | Open Glassday's page in iOS Settings (shown when access is off or add-only) |
-| `persist` | `data` (JSON string) | Save app-only state |
+| `persist` | `data` (JSON string) | Save app-only state (refused above 1 MB) |
+| `alerts` | `items` [{`id`, `title`, `body`, `at` (ms), `day`}] | Replace all pending task alerts (next 7 days, max 60) |
+| `notify-status` / `notify-auth` | | Report / request notification permission (`GDN.notify`) |
 | `haptic` | `style` (`light`/`medium`/`success`) | Haptic feedback |
 | `awake` | `on` | Keep the screen awake during focus |
 
 ### Native → page callbacks
-`GDN.access(status)` (`ask`, `granted`, `limited`, `denied`), `GDN.calendars(list, defaultId)`, `GDN.events(list, from, to)`, `GDN.saved(reqId, id, error)`, `GDN.openDay(key)`, `GDkb(keyboardHeight)`
+`GDN.access(status)` (`ask`, `granted`, `limited`, `denied`), `GDN.calendars(list, defaultId)`, `GDN.events(list, from, to)`, `GDN.saved(reqId, id, error)`, `GDN.openDay(key)`, `GDN.notify(status)`, `GDN.notice(message)`, `GDkb(keyboardHeight)`, `GDtext(zoomStep)`
 
 ### Rules for recurring and read-only events
 - Edits to a recurring event apply to **this and future** occurrences.
@@ -237,7 +247,7 @@ The whole interface is in `App/Resources/index.html`. You can open it directly i
 ## Roadmap ideas
 - [ ] Widget follows the selected theme colour (via an App Group)
 - [ ] Apple Reminders sync for inbox to-dos
-- [ ] Notifications before tasks start
+- [x] Alerts before tasks start, with location
 - [ ] Interactive widget checkboxes (iOS 17 App Intents)
 - [ ] Bundle fonts locally for full offline use
 - [x] Start/end times and a duration scroll wheel

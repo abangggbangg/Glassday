@@ -161,6 +161,9 @@ header{padding-block:14px 10px;display:flex;flex-direction:column;gap:12px}
 .tl-body .ttl{font-family:var(--f-display);font-weight:650;font-size:17px;letter-spacing:-.01em;line-height:1.2;overflow-wrap:anywhere;transition:color .3s}
 .tl-row.done .ttl{color:var(--ink3);text-decoration:line-through;text-decoration-thickness:2px}
 .tl-body .rep{font-size:11px;color:var(--ink3);margin-top:2px}
+.tl-body .loc{display:flex;align-items:center;gap:4px;color:var(--ink2);font-size:12px;overflow-wrap:anywhere}
+.tl-body .loc svg{flex:none}
+.tl-body .bell{display:inline-grid;margin-left:4px;color:var(--accent-ink)}
 .chk{width:30px;height:30px;border-radius:50%;border:2px solid var(--c);display:grid;place-items:center;color:var(--on,#fff);transition:background .25s,transform .25s}
 .chk svg{opacity:0;transform:scale(.4);transition:all .3s cubic-bezier(.3,1.8,.5,1)}
 .done .chk,.chk.on{background:var(--c)} .done .chk svg,.chk.on svg{opacity:1;transform:none}
@@ -527,7 +530,8 @@ const I={
  gear:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',
  plus:'<path d="M12 5v14M5 12h14"/>', x:'<path d="M6 6l12 12M18 6 6 18"/>', tick:'<path d="m5 12.5 4.5 4.5L19 7.5"/>',
  left:'<path d="m15 18-6-6 6-6"/>', right:'<path d="m9 18 6-6-6-6"/>', play:'<path d="M7 4.5v15l12-7.5z"/>', pause:'<path d="M8 5v14M16 5v14"/>',
- send:'<path d="M5 12h14M13 6l6 6-6 6"/>', clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>', target:'<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/>'
+ send:'<path d="M5 12h14M13 6l6 6-6 6"/>', clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>', target:'<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/>',
+ bell:'<path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15zM10 20.5a2.2 2.2 0 0 0 4 0"/>', pin:'<path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.3"/>'
 };
 const ic=(n,s=22,w=2)=>`<svg viewBox="0 0 24 24" width="${s}" height="${s}" fill="none" stroke="currentColor" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${I[n]||I.star}</svg>`;
 const TASK_ICONS=['alarm','coffee','book','code','laptop','camera','video','dumbbell','bike','car','food','drop','moon','phone','users','cart','heart','music','sun','task','star'];
@@ -558,7 +562,7 @@ const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'
 const uid=()=>Math.random().toString(36).slice(2,10);
 const NATIVE=!!(window.webkit&&window.webkit.messageHandlers&&window.webkit.messageHandlers.gd);
 const post=m=>{try{window.webkit.messageHandlers.gd.postMessage(m)}catch(e){}};
-const NAT={access:NATIVE?'pending':'web',cals:[],defCal:null,loaded:null,reqKey:null,saves:{},dirty:false};
+const NAT={notify:'unknown',access:NATIVE?'pending':'web',cals:[],defCal:null,loaded:null,reqKey:null,saves:{},dirty:false};
 const LIVE=()=>NATIVE&&NAT.access==='granted';
 
 /* ---------- state ---------- */
@@ -597,7 +601,7 @@ S.meta=S.meta||{}; S.doneN=S.doneN||{}; S.allDay=[]; S.tasks=S.tasks.filter(t=>!
 // One store per mode: UserDefaults (via persist) in the app, localStorage in a browser.
 // (The app still reads localStorage once above, to migrate data from older builds.)
 const save=()=>{const data=JSON.stringify({settings:S.settings,tasks:S.tasks.filter(t=>!t.ext&&!t.pend),meta:S.meta,doneN:S.doneN});
-  if(NATIVE) post({type:'persist',data}); else try{localStorage.setItem(LS,data)}catch(e){} };
+  if(NATIVE) post({type:'persist',data}); else try{localStorage.setItem(LS,data)}catch(e){} syncAlerts() };
 let sel=today(), view='timeline', draft=null, undoFn=null, lastDir='', calMode=S.settings.calMode||'month';
 
 function ruleHit(t,k){
@@ -804,7 +808,7 @@ function vTimeline(){
       ${live?nowMark(el):''}
       <div class="tl-time"><span>${fT(t.start)}</span>${t.dur>=30?`<span>${fT(end)}</span>`:''}</div>
       <button class="tl-pill ${live?'live':''}" style="height:${ph}px" data-act="focus" data-id="${t.id}" aria-label="Start focus for ${esc(t.title)}">${live?`<span class="elapsed" style="height:${el}%"></span>`:''}${ic(t.icon,24)}</button>
-      <button class="tl-body" data-act="edit" data-id="${t.id}"><div class="meta">${meta}</div><div class="ttl">${esc(t.title)}</div>${t.repeat!=='none'?`<div class="rep">↻ ${repLabel[t.repeat]}</div>`:''}${t.ext&&t.rep!=='none'?`<div class="rep">↻ ${repLabel[t.rep]||'Repeats'}</div>`:''}</button>
+      <button class="tl-body" data-act="edit" data-id="${t.id}"><div class="meta">${meta}</div><div class="ttl">${esc(t.title)}</div>${t.location||alertOf(t)!=null?`<div class="rep loc">${t.location?`${ic('pin',11,2.4)} ${esc(t.location)}`:''}${alertOf(t)!=null?`<span class="bell" aria-label="Alert on">${ic('bell',11,2.4)}</span>`:''}</div>`:''}${t.repeat!=='none'?`<div class="rep">↻ ${repLabel[t.repeat]}</div>`:''}${t.ext&&t.rep!=='none'?`<div class="rep">↻ ${repLabel[t.rep]||'Repeats'}</div>`:''}</button>
       <button class="chk" data-act="check" data-id="${t.id}" aria-label="Mark ${esc(t.title)} ${done?'not done':'done'}">${ic('tick',16,3)}</button>
     </div>`;
     prevEnd=Math.max(prevEnd??0,end);
@@ -996,7 +1000,8 @@ const KW=[[/gym|workout|run|exercise|yoga|training/,'dumbbell',4],[/study|lectur
 function guess(title){const s=title.toLowerCase(); for(const[r,i,c] of KW) if(r.test(s)) return {icon:i,color:COLORS[c]}; return {icon:'star',color:COLORS[6]}}
 const DAYRE='(mon|tue|tues|wed|thu|thur|thurs|fri|sat|sun)(?:day|nesday|sday|urday|rsday)?';
 function parse(text){
-  let s=' '+text.trim()+' '; const T=today(); let date=null,start=null,dur=null,repeat='none';
+  let s=' '+text.trim()+' '; const T=today(); let date=null,start=null,dur=null,repeat='none', location='';
+  {const lm=s.match(/\s@\s*(.+?)\s*$/); if(lm){location=lm[1].trim(); s=s.slice(0,lm.index)+' '}}   // "... @ Room 3.12"
   const cut=re=>{const m=s.match(re); if(m) s=s.replace(m[0],' '); return m};
   const dayIdx=w=>['sun','mon','tue','wed','thu','fri','sat'].indexOf(w.slice(0,3).toLowerCase());
   const nextDow=(i,forceNext)=>{let d=(i-dow(T)+7)%7; if(d===0&&forceNext)d=7; return addD(T,d)};
@@ -1030,21 +1035,41 @@ function parse(text){
   let title=s.replace(/\s+/g,' ').trim().replace(/^(to|on|at|for|in)\s+/i,'').replace(/\s+(on|at|for|in|by)$/i,'').trim();
   if(!title) title='New task';
   title=title[0].toUpperCase()+title.slice(1);
-  return {title,date,start,dur:dur||(start!=null?60:30),repeat,allDay,endDate,...guess(title)};
+  return {title,date,start,dur:dur||(start!=null?60:30),repeat,allDay,endDate,location,...guess(title)};
 }
 function pvHtml(p){
   const when=p.allDay?`${fmtRange(p.date,p.endDate)} · All day`:p.date?`${p.date===today()?'Today':DN[dow(p.date)]+' '+pd(p.date).getDate()+' '+MON[pd(p.date).getMonth()].slice(0,3)} · ${p.start!=null?fT(p.start):'first free slot'} · ${fD(p.dur)}`:`Inbox · ${fD(p.dur)}`;
-  return `<div class="preview" style="${cv(p.color)}"><span class="ic">${ic(p.icon,24)}</span><div style="flex:1;min-width:0"><b style="display:block;overflow-wrap:anywhere">${esc(p.title)}</b><small class="muted num">${when}${p.repeat!=='none'?' · ↻ '+repLabel[p.repeat]:''}</small></div>
+  return `<div class="preview" style="${cv(p.color)}"><span class="ic">${ic(p.icon,24)}</span><div style="flex:1;min-width:0"><b style="display:block;overflow-wrap:anywhere">${esc(p.title)}</b><small class="muted num">${when}${p.repeat!=='none'?' · ↻ '+repLabel[p.repeat]:''}${p.location?' · '+esc(p.location):''}</small></div>
     <div style="display:flex;flex-direction:column;gap:6px"><button class="btn sm" data-act="pv-add">Add</button><button class="pill-btn" data-act="pv-edit">Edit</button></div></div>`;
 }
 function commitParsed(p){
-  const t={id:uid(),title:p.title,icon:p.icon,color:p.color,date:p.date,start:p.start,dur:p.dur,repeat:p.repeat,done:{},notes:'',allDay:!!p.allDay,endDate:p.allDay?p.endDate:null};
+  const t={id:uid(),title:p.title,icon:p.icon,color:p.color,date:p.date,start:p.start,dur:p.dur,repeat:p.repeat,done:{},notes:'',location:p.location||'',allDay:!!p.allDay,endDate:p.allDay?p.endDate:null};
   if(t.date&&t.start==null&&!t.allDay){t.start=firstFree(t.date,t.dur); if(t.start==null){t.date=null; toast('No free slot that day, so it went to your Inbox')}}
   S.tasks.push(t); if(LIVE()&&t.date){pushNative(t);t.pend=true} save(); return t;
 }
+/* ---------- alerts ---------- */
+// Per-task alert: null = off, otherwise minutes before the start. Local tasks keep it on the task;
+// Apple Calendar events keep it in S.meta (app-only, like icons). The app schedules the next
+// 7 days as local notifications: title "Gym 18:00", body = the location (e.g. the classroom).
+const ALERTS=[[null,'Off'],[0,'At start'],[5,'5 min before'],[10,'10 min'],[15,'15 min'],[30,'30 min']];
+const alertOf=t=>{const v=t.ext?(S.meta[t.series]||{}).alert:t.alert; return typeof v==='number'?v:null};
+var alertSent='', alertT=null;
+function syncAlerts(){ if(!NATIVE)return; clearTimeout(alertT); alertT=setTimeout(()=>{
+  const T=today(), end=addD(T,7);
+  // calendar events must be loaded for the whole window; otherwise keep what is already scheduled
+  if(LIVE()&&!(NAT.loaded&&NAT.loaded[0]<=T&&NAT.loaded[1]>=end)) return;
+  const now=Date.now(), items=[];
+  for(let k=T;k<=end;k=addD(k,1)) for(const t of dayTasks(k)){
+    const a=alertOf(t); if(a==null||isDone(t,k)) continue;
+    const d=pd(k); d.setMinutes(t.start-a); const at=d.getTime(); if(at<=now) continue;
+    items.push({id:(t.series||t.id)+'|'+k,title:`${t.title} ${fT(t.start)}`,body:t.location||(a?`In ${fD(a)}`:'Starting now'),at,day:k});
+  }
+  items.sort((x,y)=>x.at-y.at); const list=items.slice(0,60), key=JSON.stringify(list);
+  if(key!==alertSent){alertSent=key; post({type:'alerts',items:list})}
+ },400) }
 function pushNative(t,o={}){
-  const req=uid(); NAT.saves[req]={icon:t.icon,color:t.color};
-  post({type:'upsert',reqId:req,series:o.series||null,occDate:o.occDate||null,title:t.title,date:t.date,allDay:!!t.allDay,endDate:t.allDay?(t.endDate||t.date):null,start:t.start,dur:t.dur,repeat:t.repeat||'none',notes:t.notes||'',calId:t.calId||S.settings.calId||null});
+  const req=uid(); NAT.saves[req]={icon:t.icon,color:t.color,alert:t.alert??null};
+  post({type:'upsert',reqId:req,series:o.series||null,occDate:o.occDate||null,title:t.title,date:t.date,allDay:!!t.allDay,endDate:t.allDay?(t.endDate||t.date):null,start:t.start,dur:t.dur,repeat:t.repeat||'none',notes:t.notes||'',location:t.location||'',calId:t.calId||S.settings.calId||null});
 }
 function ensureRange(){
   if(!LIVE())return;
@@ -1063,16 +1088,18 @@ window.GDN={
     const span=e=>e.allDay||(e.endDate&&e.endDate>e.date&&e.dur>=12*60);
     const ev=list.filter(e=>!span(e)).map(e=>{const m=S.meta[e.series]||{}, g=guess(e.title||'');
       return {id:e.series+'@'+e.date,series:e.series,ext:true,title:e.title||'(No title)',date:e.date,start:e.start,dur:e.dur,repeat:'none',rep:e.rep||'none',
-        icon:m.icon||g.icon,color:m.color||e.color||g.color,notes:e.notes||'',cal:e.cal,calId:e.calId,editable:!!e.editable,done:{}}});
+        icon:m.icon||g.icon,color:m.color||e.color||g.color,notes:e.notes||'',location:e.location||'',cal:e.cal,calId:e.calId,editable:!!e.editable,done:{}}});
     S.tasks=S.tasks.filter(t=>!t.ext&&!t.pend).concat(ev);
     const seen=new Set();
     S.allDay=list.filter(span).map(e=>{const m=S.meta[e.series]||{}, g=guess(e.title||'');
       return {id:'AD:'+e.series+'@'+e.date,series:e.series,ext:true,allDay:true,timedSpan:!e.allDay,title:e.title||'(No title)',date:e.date,endDate:e.endDate||e.date,
-        start:e.allDay?null:e.start,dur:e.dur||30,repeat:'none',rep:e.rep||'none',icon:m.icon||g.icon,color:m.color||e.color||g.color,notes:e.notes||'',cal:e.cal,calId:e.calId,
+        start:e.allDay?null:e.start,dur:e.dur||30,repeat:'none',rep:e.rep||'none',icon:m.icon||g.icon,color:m.color||e.color||g.color,notes:e.notes||'',location:e.location||'',cal:e.cal,calId:e.calId,
         editable:!!e.editable&&!!e.allDay,done:{}}}).filter(a=>!seen.has(a.id)&&seen.add(a.id));
-    softRender();
+    softRender(); syncAlerts();
   },
-  saved(req,id,err){const p=NAT.saves[req]; delete NAT.saves[req]; if(err){toast((req==='delete'?'Couldn’t delete from':'Couldn’t save to')+' Apple Calendar: '+err);return} if(p&&id){S.meta[id]={icon:p.icon,color:p.color};save()}},
+  saved(req,id,err){const p=NAT.saves[req]; delete NAT.saves[req]; if(err){toast((req==='delete'?'Couldn’t delete from':'Couldn’t save to')+' Apple Calendar: '+err);return} if(p&&id){S.meta[id]={icon:p.icon,color:p.color,alert:p.alert};save()}},
+  notify(s){NAT.notify=s; const w=document.getElementById('f-nwarn'); if(w) w.hidden=s!=='denied';
+    if(s==='granted'){alertSent=''; syncAlerts()} },
   notice(msg){ if(!this._noticed){this._noticed=true; toast(String(msg||''))} },   // once per session
   openDay(k){if(!/^\d{4}-\d{2}-\d{2}$/.test(k)||dk(pd(k))!==k)return; closeSheet(); sel=k; view='timeline'; render('fade'); setTimeout(scrollToNow,80)}
 };
@@ -1107,7 +1134,7 @@ function openSheet(html){
 }
 function closeSheet(){sheet.style.transform=''; sheet.classList.remove('dragging'); const ae=document.activeElement; if(ae&&sheet.contains(ae))ae.blur(); sheet.classList.remove('open'); scrim.classList.remove('open'); draft=null; if(NAT.dirty){NAT.dirty=false; setTimeout(()=>render(),60)}}
 function editSheet(t,isNew){
-  draft=JSON.parse(JSON.stringify(t)); draft._new=isNew; if(t.ext) draft.repeat=t.rep||'none';
+  draft=JSON.parse(JSON.stringify(t)); draft._new=isNew; draft.alert=alertOf(t); if(t.ext) draft.repeat=t.rep||'none';
   draft.allDay=!!draft.allDay;
   const inb=!draft.date, ro=!!(t.ext&&!t.editable), D=ro?'disabled':'', ad=draft.allDay;
   openSheet(`<h3>${isNew?'New task':'Edit task'}</h3>
@@ -1131,7 +1158,10 @@ function editSheet(t,isNew){
        <span class="tarrow">${ic('send',18,2.2)}</span>
        <label class="tcell"><span>Ends</span><input class="inp" ${D} type="time" id="f-end" step="300" value="${draft.start!=null?fT((draft.start+draft.dur)%1440):''}"></label>
      </div>
+     <div class="field" id="f-alertf" ${NATIVE?'':'hidden'}><span>Alert</span><div class="seg" style="flex-wrap:wrap">${ALERTS.map(([v,l])=>`<button type="button" class="${draft.alert===v?'on':''}" data-act="f-alert" data-v="${v==null?'':v}" aria-pressed="${draft.alert===v}">${l}</button>`).join('')}</div>
+       <p class="warn" id="f-nwarn" ${NAT.notify==='denied'?'':'hidden'} style="margin:8px 2px 0">Notifications are off for Glassday. <button type="button" class="pill-btn" data-act="open-settings">Open Settings</button></p></div>
      </div>
+     <label class="field"><span>Location</span><input class="inp" ${D} id="f-loc" value="${esc(draft.location||'')}" placeholder="Classroom, room or address" autocomplete="off" enterkeyhint="done"></label>
      ${LIVE()&&!ro&&NAT.cals.length?`<label class="field"><span>Calendar</span><select class="inp" id="f-cal">${NAT.cals.map(c=>`<option value="${esc(c.id)}" ${c.id===(draft.calId||S.settings.calId)?'selected':''}>${esc(c.title)}</option>`).join('')}</select></label>`:''}
      <div class="field" id="f-repf" ${ro?'hidden':''}><span>Repeat</span><div class="seg" style="flex-wrap:wrap">${Object.keys(repLabel).filter(r=>r!=='custom'||draft.repeat==='custom').map(r=>`<button type="button" class="${draft.repeat===r?'on':''}" data-act="f-rep" data-v="${r}" aria-pressed="${draft.repeat===r}">${r==='none'?'Once':repLabel[r]}</button>`).join('')}</div></div>
    </div>
@@ -1177,6 +1207,7 @@ function initWheels(d){
 function readForm(){
   draft.title=document.getElementById('f-title').value.trim();
   draft.notes=document.getElementById('f-notes').value;
+  const fl=document.getElementById('f-loc'); if(fl) draft.location=fl.value.trim();
   const fc=document.getElementById('f-cal'); if(fc) draft.calId=fc.value;
   draft.dur=Math.max(5,Math.min(720,+document.getElementById('f-dur').value||30));
   if(!document.getElementById('f-when').hidden){
@@ -1285,7 +1316,7 @@ document.addEventListener('click',e=>{
     case 'pv-add': if(parsed){const nt=commitParsed(parsed); parsed=null; const ta=document.getElementById('smart-in'); if(ta)ta.value='';
       render(); toast(nt.allDay?`Added all-day · ${fmtRange(nt.date,nt.endDate)}`:nt.date?`Added to ${DN[dow(nt.date)]} ${fT(nt.start)}`:'Added to Inbox',nt.pend?null:()=>{S.tasks=S.tasks.filter(x=>x!==nt);save();render()}); buzz([10,30,15])} break;
     case 'pv-edit': if(parsed){const p=parsed; let st=p.start; if(p.date&&st==null&&!p.allDay)st=firstFree(p.date,p.dur);
-      editSheet({id:uid(),title:p.title,icon:p.icon,color:p.color,date:p.date,start:st,dur:p.dur,repeat:p.repeat,done:{},notes:'',allDay:!!p.allDay,endDate:p.endDate},true)} break;
+      editSheet({id:uid(),title:p.title,icon:p.icon,color:p.color,date:p.date,start:st,dur:p.dur,repeat:p.repeat,done:{},notes:'',location:p.location||'',allDay:!!p.allDay,endDate:p.endDate},true)} break;
     case 'close': closeSheet(); break;
     case 'f-icon': draft.icon=a.dataset.v; sheet.querySelectorAll('.ipick').forEach(b=>{b.classList.toggle('on',b===a);b.setAttribute('aria-pressed',b===a)}); break;
     case 'f-color': draft.color=a.dataset.v; sheet.querySelectorAll('.cpick').forEach(b=>{b.classList.toggle('on',b===a);b.setAttribute('aria-pressed',b===a)}); sheet.querySelectorAll('.ipick').forEach(b=>{b.style.setProperty('--c',draft.color);b.style.setProperty('--on',onC(draft.color))}); break;
@@ -1300,6 +1331,10 @@ document.addEventListener('click',e=>{
       buzz(6); break; }
     case 'f-rep': draft.repeat=a.dataset.v; a.parentNode.querySelectorAll('button').forEach(b=>{b.classList.toggle('on',b===a);b.setAttribute('aria-pressed',b===a)}); break;
     case 'f-dur': setDur(+a.dataset.v); buzz(5); break;
+    case 'f-alert': { const v=a.dataset.v===''?null:+a.dataset.v; draft.alert=v;
+      a.parentNode.querySelectorAll('button').forEach(b=>{b.classList.toggle('on',b===a);b.setAttribute('aria-pressed',b===a)});
+      if(v!=null&&NAT.notify!=='granted') post({type:'notify-auth'});   // ask the first time an alert is turned on
+      buzz(5); break; }
     case 'wpick': scrollWheel(a.dataset.w,+a.dataset.i,true); break;
     case 'save': { readForm(); const ti=document.getElementById('f-title');
       if(!draft.title){ti.classList.remove('shake');void ti.offsetWidth;ti.classList.add('shake');ti.focus();buzz(30);break}
@@ -1307,15 +1342,15 @@ document.addEventListener('click',e=>{
       if(!draft.date) draft.repeat='none';
       if(LIVE()&&(draft.date||draft.ext)){
         const d=draft, orig=byId(d.id); closeSheet();
-        if(d.ext&&!d.editable){ S.meta[d.series]={icon:d.icon,color:d.color}; [...S.tasks,...S.allDay].forEach(x=>{if(x.series===d.series){x.icon=d.icon;x.color=d.color}}); save(); render(); toast('Saved icon and colour'); break }
+        if(d.ext&&!d.editable){ S.meta[d.series]={icon:d.icon,color:d.color,alert:d.alert}; [...S.tasks,...S.allDay].forEach(x=>{if(x.series===d.series){x.icon=d.icon;x.color=d.color}}); save(); render(); toast('Saved'); break }
         if(orig) removeTask(orig);
         if(d.date){
-          const local={id:uid(),title:d.title,icon:d.icon,color:d.color,date:d.date,start:d.start,dur:d.dur,repeat:d.repeat,notes:d.notes,done:{},calId:d.calId,allDay:!!d.allDay,endDate:d.allDay?d.endDate:null};
+          const local={id:uid(),title:d.title,icon:d.icon,color:d.color,date:d.date,start:d.start,dur:d.dur,repeat:d.repeat,notes:d.notes,location:d.location||'',alert:d.alert,done:{},calId:d.calId,allDay:!!d.allDay,endDate:d.allDay?d.endDate:null};
           S.tasks.push(local); pushNative(local,d.ext&&orig?{series:d.series,occDate:orig.date}:{}); local.pend=true;
-          if(d.ext) S.meta[d.series]={icon:d.icon,color:d.color};
+          if(d.ext) S.meta[d.series]={icon:d.icon,color:d.color,alert:d.alert};
         }else{
           post({type:'delete',series:d.series,occDate:orig?orig.date:d.date,span:d.rep&&d.rep!=='none'?'future':'one'});
-          S.tasks.push({id:uid(),title:d.title,icon:d.icon,color:d.color,date:null,start:null,dur:d.dur,repeat:'none',notes:d.notes,done:{}});
+          S.tasks.push({id:uid(),title:d.title,icon:d.icon,color:d.color,date:null,start:null,dur:d.dur,repeat:'none',notes:d.notes,location:d.location||'',done:{}});
         }
         save(); if(d.date&&d.date!==sel&&view==='timeline'){lastDir=d.date>sel?'slide-l':'slide-r';sel=d.date;render(lastDir)} else render();
         toast(d.date?'Saved to Apple Calendar':'Moved to Inbox'); buzz([10,30,15]); break;
@@ -1435,6 +1470,7 @@ sheet.addEventListener('focusin',e=>{ const el=e.target; if(!el.matches('input:n
 setInterval(()=>{ if(!sheet.classList.contains('open')&&(view==='timeline'||view==='week')&&sel===today()) render() },30000);
 document.addEventListener('visibilitychange',()=>{
   // native drops keep-awake when the app goes to the background; ask again if focus is still running
+  if(!document.hidden) syncAlerts();   // roll the 7-day alert window forward
   if(!document.hidden&&F.run){ if(NATIVE) post({type:'awake',on:true}); tickFocus() }
   if(!document.hidden&&!sheet.classList.contains('open')) render() });
 
@@ -1448,7 +1484,7 @@ applyTheme(); render('fade'); setTimeout(scrollToNow,120);
   sp.addEventListener('click',leave);
   setTimeout(leave, reduce?250:2300);
 })();
-if(NATIVE){post({type:'ready'}); post({type:'status'})}
+if(NATIVE){post({type:'ready'}); post({type:'status'}); post({type:'notify-status'}); syncAlerts()}
 })();
 </script>
 

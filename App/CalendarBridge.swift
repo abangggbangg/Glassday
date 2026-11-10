@@ -7,8 +7,8 @@ import WidgetKit
 ///
 /// Page → native messages (window.webkit.messageHandlers.gd.postMessage):
 ///   ready, access, load{from,to}, upsert{...}, delete{series,occDate,span},
-///   persist{data}, haptic{style}, awake{on}
-/// Native → page calls: GDN.access, GDN.calendars, GDN.events, GDN.saved, GDN.openDay
+///   persist{data}, haptic{style}, awake{on}, alerts{items}, notify-status, notify-auth
+/// Native → page calls: GDN.access, GDN.calendars, GDN.events, GDN.saved, GDN.openDay, GDN.notify, GDN.notice
 final class CalendarBridge: NSObject, WKScriptMessageHandler {
     static let stateKey = "gd.state"
     /// Typical state is a few KB; 1 MB is thousands of to-dos.
@@ -51,6 +51,12 @@ final class CalendarBridge: NSObject, WKScriptMessageHandler {
             reportStatus()
         case "access":
             requestAccess()
+        case "alerts":
+            Alerts.shared.replace(with: body["items"] as? [[String: Any]] ?? [])
+        case "notify-status":
+            Alerts.shared.status { [weak self] s in self?.run("GDN.notify && GDN.notify(\(self?.json(s) ?? "null"))") }
+        case "notify-auth":
+            Alerts.shared.requestAccess { [weak self] s in self?.run("GDN.notify && GDN.notify(\(self?.json(s) ?? "null"))") }
         case "scheme":
             onScheme?(body["mode"] as? String ?? "system")
         case "settings":
@@ -175,6 +181,7 @@ final class CalendarBridge: NSObject, WKScriptMessageHandler {
                 "cal": e.calendar.title,
                 "calId": e.calendar.calendarIdentifier,
                 "notes": e.notes ?? "",
+                "location": e.location ?? "",
                 "editable": e.calendar.allowsContentModifications,
                 "rep": repeatName(e)
             ]
@@ -265,6 +272,7 @@ final class CalendarBridge: NSObject, WKScriptMessageHandler {
         event.startDate = start
         event.endDate = finish
         if let notes = b["notes"] as? String { event.notes = notes.isEmpty ? nil : notes }
+        if let place = b["location"] as? String { event.location = place.isEmpty ? nil : place }
 
         if let rep = b["repeat"] as? String, rep != "custom" {
             event.recurrenceRules = rule(for: rep).map { [$0] }

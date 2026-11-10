@@ -32,6 +32,7 @@ final class WebModel: NSObject, ObservableObject, WKNavigationDelegate {
 
     override init() {
         super.init()
+        Alerts.shared.onOpenDay = { [weak self] day in self?.bridge.openDay(day) }
         bridge.onScheme = { [weak self] mode in
             self?.scheme = mode == "dark" ? .dark : mode == "light" ? .light : nil
         }
