@@ -11,6 +11,8 @@ import WidgetKit
 /// Native → page calls: GDN.access, GDN.calendars, GDN.events, GDN.saved, GDN.openDay
 final class CalendarBridge: NSObject, WKScriptMessageHandler {
     static let stateKey = "gd.state"
+    /// Typical state is a few KB; 1 MB is thousands of to-dos.
+    static let maxStateBytes = 1_000_000
 
     let store = EKEventStore()
     weak var webView: WKWebView?
@@ -62,7 +64,13 @@ final class CalendarBridge: NSObject, WKScriptMessageHandler {
         case "delete":
             delete(body)
         case "persist":
-            if let data = body["data"] as? String { UserDefaults.standard.set(data, forKey: Self.stateKey) }
+            guard let data = body["data"] as? String else { break }
+            // UserDefaults is read in full at launch; refuse runaway blobs instead of slowing every start.
+            if data.utf8.count > Self.maxStateBytes {
+                run("GDN.notice && GDN.notice(\(json("Too much data to save on this phone. Remove some old to-dos, or copy a backup in Settings.")))")
+            } else {
+                UserDefaults.standard.set(data, forKey: Self.stateKey)
+            }
         case "haptic":
             haptic(body["style"] as? String)
         case "awake":
@@ -362,15 +370,19 @@ final class CalendarBridge: NSObject, WKScriptMessageHandler {
         return String(format: "#%02X%02X%02X", Int(r * 255), Int(g * 255), Int(b * 255))
     }
 
+    /// A JS literal for any value. Every path escapes U+2028/U+2029 (line terminators in pre-ES2019 JS).
     private func json(_ value: Any) -> String {
+        let jsSafe = { (s: String) in
+            s.replacingOccurrences(of: "\u{2028}", with: "\\u2028").replacingOccurrences(of: "\u{2029}", with: "\\u2029")
+        }
         if let s = value as? String {
             let data = (try? JSONSerialization.data(withJSONObject: [s])) ?? Data("[\"\"]".utf8)
             let arr = String(data: data, encoding: .utf8) ?? "[\"\"]"
-            return String(arr.dropFirst().dropLast()).replacingOccurrences(of: "\u{2028}", with: "\\u2028")
+            return jsSafe(String(arr.dropFirst().dropLast()))
         }
         guard JSONSerialization.isValidJSONObject(value),
               let data = try? JSONSerialization.data(withJSONObject: value),
               let s = String(data: data, encoding: .utf8) else { return "null" }
-        return s.replacingOccurrences(of: "\u{2028}", with: "\\u2028").replacingOccurrences(of: "\u{2029}", with: "\\u2029")
+        return jsSafe(s)
     }
 }
