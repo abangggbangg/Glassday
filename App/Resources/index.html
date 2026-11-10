@@ -1425,7 +1425,9 @@ function setKb(px){ const k=px>80?Math.round(px):0; document.documentElement.sty
 window.GDkb=px=>{nativeKb=true;setKb(px/(window.GDZ||1))};   // points -> CSS px when zoomed for Dynamic Type
 const vv=window.visualViewport;
 if(vv){const onVV=()=>{ if(!nativeKb) setKb(window.innerHeight-vv.height-vv.offsetTop) }; vv.addEventListener('resize',onVV); vv.addEventListener('scroll',onVV)}
-sheet.addEventListener('focusin',e=>{ const el=e.target; if(!el.matches('input,textarea,select'))return;
+// Text fields only: iOS anchors its date/time/select popovers to the field when focused, so
+// scrolling those afterwards left the popover floating over the wrong field.
+sheet.addEventListener('focusin',e=>{ const el=e.target; if(!el.matches('input:not([type=date]):not([type=time]):not([type=hidden]),textarea'))return;
   setTimeout(()=>{ const b=document.getElementById('sheet-body'); if(!b||!b.contains(el))return; const r=el.getBoundingClientRect(), br=b.getBoundingClientRect();
     if(r.bottom>br.bottom-12||r.top<br.top) b.scrollBy({top:r.top-br.top-br.height/3,behavior:reduce?'auto':'smooth'}) },320) });
 
