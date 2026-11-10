@@ -10,6 +10,8 @@ struct ContentView: View {
         WebView(webView: model.webView)
             .ignoresSafeArea()
             .background(Color("LaunchBackground"))
+            // The page's Light/Dark setting also drives the status bar, keyboard and pickers.
+            .preferredColorScheme(model.scheme)
             .onOpenURL { model.open($0) }
             .onChange(of: scenePhase) { _, phase in
                 switch phase {
@@ -25,6 +27,15 @@ struct ContentView: View {
 
 final class WebModel: NSObject, ObservableObject, WKNavigationDelegate {
     let bridge = CalendarBridge()
+    /// nil follows the system; set when the page picks Light or Dark in its own settings.
+    @Published var scheme: ColorScheme?
+
+    override init() {
+        super.init()
+        bridge.onScheme = { [weak self] mode in
+            self?.scheme = mode == "dark" ? .dark : mode == "light" ? .light : nil
+        }
+    }
 
     lazy var webView: WKWebView = {
         let config = WKWebViewConfiguration()

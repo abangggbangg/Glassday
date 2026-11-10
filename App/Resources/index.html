@@ -681,6 +681,7 @@ try{darkMQ.addEventListener('change',applyPalette)}catch(e){}
 function applyTheme(){
   const th=S.settings.theme; const r=document.documentElement;
   if(th==='system')r.removeAttribute('data-theme'); else r.setAttribute('data-theme',th);
+  if(NATIVE) post({type:'scheme',mode:th});   // status bar, keyboard and pickers follow
   applyPalette();
 }
 

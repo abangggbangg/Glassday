@@ -14,6 +14,8 @@ final class CalendarBridge: NSObject, WKScriptMessageHandler {
 
     let store = EKEventStore()
     weak var webView: WKWebView?
+    /// The page's appearance choice: "light", "dark" or "system".
+    var onScheme: ((String) -> Void)?
 
     private var range: (start: Date, end: Date, from: String, to: String)?
     private var pageReady = false
@@ -45,6 +47,8 @@ final class CalendarBridge: NSObject, WKScriptMessageHandler {
             reportStatus()
         case "access":
             requestAccess()
+        case "scheme":
+            onScheme?(body["mode"] as? String ?? "system")
         case "settings":
             if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
         case "load":
