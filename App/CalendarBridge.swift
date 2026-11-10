@@ -88,6 +88,15 @@ final class CalendarBridge: NSObject, WKScriptMessageHandler {
         WidgetCenter.shared.reloadAllTimelines()
     }
 
+    /// The web view is about to reload (content process died). Forget page state and
+    /// never leave the screen pinned awake by a page that no longer exists.
+    func pageWillReload() {
+        pageReady = false
+        range = nil
+        reloadWork?.cancel()
+        UIApplication.shared.isIdleTimerDisabled = false
+    }
+
     func appBecameActive() {
         guard pageReady else { return }
         requestAccess()   // picks up a permission change made in Settings

@@ -17,24 +17,18 @@ struct ContentView: View {
     }
 }
 
-final class WebModel: ObservableObject {
+final class WebModel: NSObject, ObservableObject, WKNavigationDelegate {
     let bridge = CalendarBridge()
 
     lazy var webView: WKWebView = {
         let config = WKWebViewConfiguration()
         let controller = WKUserContentController()
-
-        // Hand the page its saved state before any of its scripts run.
-        let saved = UserDefaults.standard.string(forKey: CalendarBridge.stateKey) ?? ""
-        let literal = (try? JSONEncoder().encode(saved)).flatMap { String(data: $0, encoding: .utf8) } ?? "\"\""
-        controller.addUserScript(WKUserScript(
-            source: "window.GD_NATIVE=true;window.GD_SAVED=\(literal);",
-            injectionTime: .atDocumentStart,
-            forMainFrameOnly: true))
+        installStateScript(controller)
         controller.add(bridge, name: "gd")
         config.userContentController = controller
 
         let view = WKWebView(frame: .zero, configuration: config)
+        view.navigationDelegate = self
         view.isOpaque = false
         view.backgroundColor = .clear
         view.scrollView.backgroundColor = .clear
@@ -52,6 +46,41 @@ final class WebModel: ObservableObject {
         }
         return view
     }()
+
+    /// Hand the page its saved state before any of its scripts run.
+    /// Re-run before every reload so the page never boots from a stale snapshot.
+    private func installStateScript(_ controller: WKUserContentController) {
+        controller.removeAllUserScripts()
+        let saved = UserDefaults.standard.string(forKey: CalendarBridge.stateKey) ?? ""
+        let literal = (try? JSONEncoder().encode(saved)).flatMap { String(data: $0, encoding: .utf8) } ?? "\"\""
+        let safe = literal.replacingOccurrences(of: "\u{2028}", with: "\\u2028")
+            .replacingOccurrences(of: "\u{2029}", with: "\\u2029")
+        controller.addUserScript(WKUserScript(
+            source: "window.GD_NATIVE=true;window.GD_SAVED=\(safe);",
+            injectionTime: .atDocumentStart,
+            forMainFrameOnly: true))
+    }
+
+    // MARK: navigation
+
+    /// iOS can kill the web content process (usually under memory pressure while backgrounded).
+    /// Without this the app comes back as a blank screen until it is force-quit.
+    func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
+        bridge.pageWillReload()
+        installStateScript(webView.configuration.userContentController)
+        webView.reload()
+    }
+
+    /// The page is a local file; anything else (a stray link) opens outside the app.
+    func webView(_ webView: WKWebView, decidePolicyFor action: WKNavigationAction,
+                 decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+        guard let url = action.request.url else { return decisionHandler(.cancel) }
+        if url.isFileURL || url.scheme == "about" { return decisionHandler(.allow) }
+        if action.navigationType == .linkActivated, ["http", "https", "mailto", "tel"].contains(url.scheme ?? "") {
+            UIApplication.shared.open(url)
+        }
+        decisionHandler(.cancel)
+    }
 
     /// Tell the page how tall the keyboard is, and stop iOS from shifting the whole web view up.
     private func observeKeyboard(_ view: WKWebView) {
