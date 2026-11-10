@@ -300,6 +300,14 @@ header{padding-block:14px 10px;display:flex;flex-direction:column;gap:12px}
 .delopts .pill-btn{align-self:center;margin-top:2px}
 [hidden]{display:none!important}
 .toggle{width:100%;text-align:left}
+.opts{border-radius:16px;background:var(--glass-soft);border:1px solid var(--stroke);margin-bottom:14px;overflow:hidden}
+.opt{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:50px;padding:0 12px 0 14px;position:relative}
+.opt+.opt:not([hidden]){border-top:1px solid var(--hair)} .opt[hidden]+.opt{border-top:0}
+.opt .ol{display:flex;align-items:center;gap:12px;font-weight:600;white-space:nowrap}
+.opt .ol svg{color:var(--ink2)}
+.opt .ov{display:flex;align-items:center;gap:4px;min-width:0;color:var(--ink2)}
+.opt select{-webkit-appearance:none;appearance:none;border:0;background:none;color:var(--ink2);font:inherit;font-size:16px;text-align:right;text-align-last:right;padding:14px 0;min-width:0;max-width:52vw;outline:none}
+.opt select:focus-visible{color:var(--accent-ink)}
 .timebox{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:end;gap:8px;margin-bottom:14px}
 .tcell{display:flex;flex-direction:column;gap:6px;min-width:0}
 .tcell>span{font-size:12px;font-weight:700;color:var(--ink3);letter-spacing:.06em;text-transform:uppercase}
@@ -531,6 +539,7 @@ const I={
  plus:'<path d="M12 5v14M5 12h14"/>', x:'<path d="M6 6l12 12M18 6 6 18"/>', tick:'<path d="m5 12.5 4.5 4.5L19 7.5"/>',
  left:'<path d="m15 18-6-6 6-6"/>', right:'<path d="m9 18 6-6-6-6"/>', play:'<path d="M7 4.5v15l12-7.5z"/>', pause:'<path d="M8 5v14M16 5v14"/>',
  send:'<path d="M5 12h14M13 6l6 6-6 6"/>', clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>', target:'<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/>',
+ updown:'<path d="m8 9 4-4 4 4M8 15l4 4 4-4"/>', repeat:'<path d="M17 2l3 3-3 3M4 11V9a4 4 0 0 1 4-4h16M7 22l-3-3 3-3M20 13v2a4 4 0 0 1-4 4H4"/>',
  bell:'<path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15zM10 20.5a2.2 2.2 0 0 0 4 0"/>', pin:'<path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.3"/>'
 };
 const ic=(n,s=22,w=2)=>`<svg viewBox="0 0 24 24" width="${s}" height="${s}" fill="none" stroke="currentColor" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${I[n]||I.star}</svg>`;
@@ -612,6 +621,7 @@ function ruleHit(t,k){
     case 'daily': return true;
     case 'weekdays': {const w=dow(k);return w>0&&w<6}
     case 'weekly': return dow(k)===dow(t.date);
+    case 'biweekly': return dow(k)===dow(t.date)&&(dBetween(t.date,k)/7)%2===0;
     case 'monthly': return pd(k).getDate()===pd(t.date).getDate();
     case 'yearly': {const a=pd(k),b=pd(t.date);return a.getDate()===b.getDate()&&a.getMonth()===b.getMonth()}
     default: return k===t.date;
@@ -661,7 +671,9 @@ const byId=id=>{
   const k=id.slice(i+1); return Object.assign({},b,{id,date:k,endDate:addD(k,dBetween(b.date,adEnd(b))),baseId:b.id});
 };
 let editOcc=null;
-const repLabel={none:'',daily:'Every day',weekdays:'Weekdays',weekly:'Every week',monthly:'Every month',yearly:'Every year',custom:'Repeats'};
+const repLabel={none:'',daily:'Every day',weekdays:'Weekdays',weekly:'Every week',biweekly:'Every 2 weeks',monthly:'Every month',yearly:'Every year',custom:'Repeats'};
+// Apple Calendar's Repeat menu wording
+const REPEATS=[['none','Never'],['daily','Every Day'],['weekdays','Every Weekday'],['weekly','Every Week'],['biweekly','Every 2 Weeks'],['monthly','Every Month'],['yearly','Every Year']];
 
 function freeSlots(k,from){
   const ds=S.settings.dayStart*60, de=S.settings.dayEnd*60;
@@ -808,7 +820,7 @@ function vTimeline(){
       ${live?nowMark(el):''}
       <div class="tl-time"><span>${fT(t.start)}</span>${t.dur>=30?`<span>${fT(end)}</span>`:''}</div>
       <button class="tl-pill ${live?'live':''}" style="height:${ph}px" data-act="focus" data-id="${t.id}" aria-label="Start focus for ${esc(t.title)}">${live?`<span class="elapsed" style="height:${el}%"></span>`:''}${ic(t.icon,24)}</button>
-      <button class="tl-body" data-act="edit" data-id="${t.id}"><div class="meta">${meta}</div><div class="ttl">${esc(t.title)}</div>${t.location||alertOf(t)!=null?`<div class="rep loc">${t.location?`${ic('pin',11,2.4)} ${esc(t.location)}`:''}${alertOf(t)!=null?`<span class="bell" aria-label="Alert on">${ic('bell',11,2.4)}</span>`:''}</div>`:''}${t.repeat!=='none'?`<div class="rep">↻ ${repLabel[t.repeat]}</div>`:''}${t.ext&&t.rep!=='none'?`<div class="rep">↻ ${repLabel[t.rep]||'Repeats'}</div>`:''}</button>
+      <button class="tl-body" data-act="edit" data-id="${t.id}"><div class="meta">${meta}</div><div class="ttl">${esc(t.title)}</div>${t.location||alertsOf(t).length?`<div class="rep loc">${t.location?`${ic('pin',11,2.4)} ${esc(t.location)}`:''}${alertsOf(t).length?`<span class="bell" aria-label="Alert on">${ic('bell',11,2.4)}</span>`:''}</div>`:''}${t.repeat!=='none'?`<div class="rep">↻ ${repLabel[t.repeat]}</div>`:''}${t.ext&&t.rep!=='none'?`<div class="rep">↻ ${repLabel[t.rep]||'Repeats'}</div>`:''}</button>
       <button class="chk" data-act="check" data-id="${t.id}" aria-label="Mark ${esc(t.title)} ${done?'not done':'done'}">${ic('tick',16,3)}</button>
     </div>`;
     prevEnd=Math.max(prevEnd??0,end);
@@ -1006,7 +1018,8 @@ function parse(text){
   const dayIdx=w=>['sun','mon','tue','wed','thu','fri','sat'].indexOf(w.slice(0,3).toLowerCase());
   const nextDow=(i,forceNext)=>{let d=(i-dow(T)+7)%7; if(d===0&&forceNext)d=7; return addD(T,d)};
   let m;
-  if(cut(/\b(every ?day|daily)\b/i)) repeat='daily';
+  if(cut(/\b(every (?:2|two|other) weeks?|fortnightly|bi-?weekly)\b/i)) repeat='biweekly';
+  else if(cut(/\b(every ?day|daily)\b/i)) repeat='daily';
   else if(cut(/\b(every )?weekdays?\b/i)) repeat='weekdays';
   else if(m=cut(new RegExp('\\bevery '+DAYRE+'\\b','i'))){repeat='weekly';date=nextDow(dayIdx(m[1]))}
   else if(cut(/\b(every ?month|monthly)\b/i)) repeat='monthly';
@@ -1048,28 +1061,31 @@ function commitParsed(p){
   S.tasks.push(t); if(LIVE()&&t.date){pushNative(t);t.pend=true} save(); return t;
 }
 /* ---------- alerts ---------- */
-// Per-task alert: null = off, otherwise minutes before the start. Local tasks keep it on the task;
-// Apple Calendar events keep it in S.meta (app-only, like icons). The app schedules the next
-// 7 days as local notifications: title "Gym 18:00", body = the location (e.g. the classroom).
-const ALERTS=[[null,'Off'],[0,'At start'],[5,'5 min before'],[10,'10 min'],[15,'15 min'],[30,'30 min']];
-const alertOf=t=>{const v=t.ext?(S.meta[t.series]||{}).alert:t.alert; return typeof v==='number'?v:null};
+// Alerts work like Apple Calendar: up to two per task, as minutes before the start.
+// - Calendar events: saved as real EKAlarms, so iOS itself notifies (title, time, location),
+//   even when Glassday isn't open, and they match the Calendar app.
+// - Tasks kept only in Glassday (Calendar access off): scheduled here as local notifications for
+//   the next 7 days: title "Gym 18:00", body = the location (e.g. the classroom).
+const ALERTS=[[null,'None'],[0,'At time of event'],[5,'5 minutes before'],[10,'10 minutes before'],[15,'15 minutes before'],[30,'30 minutes before'],
+  [60,'1 hour before'],[120,'2 hours before'],[1440,'1 day before'],[2880,'2 days before'],[10080,'1 week before']];
+const alertLabel=m=>(ALERTS.find(a=>a[0]===m)||[m,m%1440===0?`${m/1440} days before`:m%60===0?`${m/60} hours before`:`${m} minutes before`])[1];
+const alertsOf=t=>Array.isArray(t.alerts)?t.alerts.filter(n=>typeof n==='number'):typeof t.alert==='number'?[t.alert]:[];
 var alertSent='', alertT=null;
 function syncAlerts(){ if(!NATIVE)return; clearTimeout(alertT); alertT=setTimeout(()=>{
-  const T=today(), end=addD(T,7);
-  // calendar events must be loaded for the whole window; otherwise keep what is already scheduled
-  if(LIVE()&&!(NAT.loaded&&NAT.loaded[0]<=T&&NAT.loaded[1]>=end)) return;
-  const now=Date.now(), items=[];
+  const T=today(), end=addD(T,7), now=Date.now(), items=[];
   for(let k=T;k<=end;k=addD(k,1)) for(const t of dayTasks(k)){
-    const a=alertOf(t); if(a==null||isDone(t,k)) continue;
-    const d=pd(k); d.setMinutes(t.start-a); const at=d.getTime(); if(at<=now) continue;
-    items.push({id:(t.series||t.id)+'|'+k,title:`${t.title} ${fT(t.start)}`,body:t.location||(a?`In ${fD(a)}`:'Starting now'),at,day:k});
+    if(t.ext||t.pend||isDone(t,k)) continue;       // Calendar events (and saves in flight) alert through their own alarms
+    for(const a of alertsOf(t)){
+      const d=pd(k); d.setMinutes(t.start-a); const at=d.getTime(); if(at<=now) continue;
+      items.push({id:t.id+'|'+k+'|'+a,title:`${t.title} ${fT(t.start)}`,body:t.location||(a?`In ${fD(a)}`:'Starting now'),at,day:k});
+    }
   }
   items.sort((x,y)=>x.at-y.at); const list=items.slice(0,60), key=JSON.stringify(list);
   if(key!==alertSent){alertSent=key; post({type:'alerts',items:list})}
  },400) }
 function pushNative(t,o={}){
-  const req=uid(); NAT.saves[req]={icon:t.icon,color:t.color,alert:t.alert??null};
-  post({type:'upsert',reqId:req,series:o.series||null,occDate:o.occDate||null,title:t.title,date:t.date,allDay:!!t.allDay,endDate:t.allDay?(t.endDate||t.date):null,start:t.start,dur:t.dur,repeat:t.repeat||'none',notes:t.notes||'',location:t.location||'',calId:t.calId||S.settings.calId||null});
+  const req=uid(); NAT.saves[req]={icon:t.icon,color:t.color};
+  post({type:'upsert',reqId:req,series:o.series||null,occDate:o.occDate||null,title:t.title,date:t.date,allDay:!!t.allDay,endDate:t.allDay?(t.endDate||t.date):null,start:t.start,dur:t.dur,repeat:t.repeat||'none',notes:t.notes||'',location:t.location||'',alerts:t.alertsDirty?alertsOf(t):null,calId:t.calId||S.settings.calId||null});
 }
 function ensureRange(){
   if(!LIVE())return;
@@ -1088,17 +1104,17 @@ window.GDN={
     const span=e=>e.allDay||(e.endDate&&e.endDate>e.date&&e.dur>=12*60);
     const ev=list.filter(e=>!span(e)).map(e=>{const m=S.meta[e.series]||{}, g=guess(e.title||'');
       return {id:e.series+'@'+e.date,series:e.series,ext:true,title:e.title||'(No title)',date:e.date,start:e.start,dur:e.dur,repeat:'none',rep:e.rep||'none',
-        icon:m.icon||g.icon,color:m.color||e.color||g.color,notes:e.notes||'',location:e.location||'',cal:e.cal,calId:e.calId,editable:!!e.editable,done:{}}});
+        icon:m.icon||g.icon,color:m.color||e.color||g.color,notes:e.notes||'',location:e.location||'',alerts:e.alerts||[],cal:e.cal,calId:e.calId,editable:!!e.editable,done:{}}});
     S.tasks=S.tasks.filter(t=>!t.ext&&!t.pend).concat(ev);
     const seen=new Set();
     S.allDay=list.filter(span).map(e=>{const m=S.meta[e.series]||{}, g=guess(e.title||'');
       return {id:'AD:'+e.series+'@'+e.date,series:e.series,ext:true,allDay:true,timedSpan:!e.allDay,title:e.title||'(No title)',date:e.date,endDate:e.endDate||e.date,
-        start:e.allDay?null:e.start,dur:e.dur||30,repeat:'none',rep:e.rep||'none',icon:m.icon||g.icon,color:m.color||e.color||g.color,notes:e.notes||'',location:e.location||'',cal:e.cal,calId:e.calId,
+        start:e.allDay?null:e.start,dur:e.dur||30,repeat:'none',rep:e.rep||'none',icon:m.icon||g.icon,color:m.color||e.color||g.color,notes:e.notes||'',location:e.location||'',alerts:e.alerts||[],cal:e.cal,calId:e.calId,
         editable:!!e.editable&&!!e.allDay,done:{}}}).filter(a=>!seen.has(a.id)&&seen.add(a.id));
     softRender(); syncAlerts();
   },
-  saved(req,id,err){const p=NAT.saves[req]; delete NAT.saves[req]; if(err){toast((req==='delete'?'Couldn’t delete from':'Couldn’t save to')+' Apple Calendar: '+err);return} if(p&&id){S.meta[id]={icon:p.icon,color:p.color,alert:p.alert};save()}},
-  notify(s){NAT.notify=s; const w=document.getElementById('f-nwarn'); if(w) w.hidden=s!=='denied';
+  saved(req,id,err){const p=NAT.saves[req]; delete NAT.saves[req]; if(err){toast((req==='delete'?'Couldn’t delete from':'Couldn’t save to')+' Apple Calendar: '+err);return} if(p&&id){S.meta[id]={icon:p.icon,color:p.color};save()}},
+  notify(s){NAT.notify=s; const w=document.getElementById('f-nwarn'); if(w) w.hidden=LIVE()||s!=='denied';
     if(s==='granted'){alertSent=''; syncAlerts()} },
   notice(msg){ if(!this._noticed){this._noticed=true; toast(String(msg||''))} },   // once per session
   openDay(k){if(!/^\d{4}-\d{2}-\d{2}$/.test(k)||dk(pd(k))!==k)return; closeSheet(); sel=k; view='timeline'; render('fade'); setTimeout(scrollToNow,80)}
@@ -1134,7 +1150,7 @@ function openSheet(html){
 }
 function closeSheet(){sheet.style.transform=''; sheet.classList.remove('dragging'); const ae=document.activeElement; if(ae&&sheet.contains(ae))ae.blur(); sheet.classList.remove('open'); scrim.classList.remove('open'); draft=null; if(NAT.dirty){NAT.dirty=false; setTimeout(()=>render(),60)}}
 function editSheet(t,isNew){
-  draft=JSON.parse(JSON.stringify(t)); draft._new=isNew; draft.alert=alertOf(t); if(t.ext) draft.repeat=t.rep||'none';
+  draft=JSON.parse(JSON.stringify(t)); draft._new=isNew; draft.alerts=alertsOf(t).slice(0,2); delete draft.alert; if(t.ext) draft.repeat=t.rep||'none';
   draft.allDay=!!draft.allDay;
   const inb=!draft.date, ro=!!(t.ext&&!t.editable), D=ro?'disabled':'', ad=draft.allDay;
   openSheet(`<h3>${isNew?'New task':'Edit task'}</h3>
@@ -1158,12 +1174,10 @@ function editSheet(t,isNew){
        <span class="tarrow">${ic('send',18,2.2)}</span>
        <label class="tcell"><span>Ends</span><input class="inp" ${D} type="time" id="f-end" step="300" value="${draft.start!=null?fT((draft.start+draft.dur)%1440):''}"></label>
      </div>
-     <div class="field" id="f-alertf" ${NATIVE?'':'hidden'}><span>Alert</span><div class="seg" style="flex-wrap:wrap">${ALERTS.map(([v,l])=>`<button type="button" class="${draft.alert===v?'on':''}" data-act="f-alert" data-v="${v==null?'':v}" aria-pressed="${draft.alert===v}">${l}</button>`).join('')}</div>
-       <p class="warn" id="f-nwarn" ${NAT.notify==='denied'?'':'hidden'} style="margin:8px 2px 0">Notifications are off for Glassday. <button type="button" class="pill-btn" data-act="open-settings">Open Settings</button></p></div>
      </div>
      <label class="field"><span>Location</span><input class="inp" ${D} id="f-loc" value="${esc(draft.location||'')}" placeholder="Classroom, room or address" autocomplete="off" enterkeyhint="done"></label>
      ${LIVE()&&!ro&&NAT.cals.length?`<label class="field"><span>Calendar</span><select class="inp" id="f-cal">${NAT.cals.map(c=>`<option value="${esc(c.id)}" ${c.id===(draft.calId||S.settings.calId)?'selected':''}>${esc(c.title)}</option>`).join('')}</select></label>`:''}
-     <div class="field" id="f-repf" ${ro?'hidden':''}><span>Repeat</span><div class="seg" style="flex-wrap:wrap">${Object.keys(repLabel).filter(r=>r!=='custom'||draft.repeat==='custom').map(r=>`<button type="button" class="${draft.repeat===r?'on':''}" data-act="f-rep" data-v="${r}" aria-pressed="${draft.repeat===r}">${r==='none'?'Once':repLabel[r]}</button>`).join('')}</div></div>
+     ${optionsCard(draft,ro,ad)}
    </div>
    <div class="field" id="f-durf" ${ro||(ad&&!inb)?'hidden':''}><span class="dhead">Duration <b id="f-dlabel">${fD(draft.dur)}</b></span>
      <div class="wheels"><div class="wband"></div>
@@ -1178,6 +1192,18 @@ function editSheet(t,isNew){
   initWheels(draft.dur);
   if(isNew&&matchMedia('(hover: hover) and (pointer: fine)').matches) setTimeout(()=>{const i=document.getElementById('f-title'); i&&i.focus()},350);
   checkWarn();
+}
+// Apple-style option rows: icon + label on the left, the current choice and a native pop-up menu on the right
+function optionsCard(d,ro,ad){
+  const a1=d.alerts[0]??null, a2=d.alerts[1]??null, showAl=NATIVE&&!ro;
+  const opts=(cur)=>{const list=ALERTS.some(a=>a[0]===cur)?ALERTS:[...ALERTS,[cur,alertLabel(cur)]]; return list.map(([v,l])=>`<option value="${v??''}" ${v===cur?'selected':''}>${l}</option>`).join('')};
+  const reps=REPEATS.concat(d.repeat==='custom'?[['custom','Custom']]:[]).map(([v,l])=>`<option value="${v}" ${d.repeat===v?'selected':''} ${v==='custom'?'disabled':''}>${l}</option>`).join('');
+  return `<div class="opts">
+    <label class="opt" id="f-repf" ${ro?'hidden':''}><span class="ol">${ic('repeat',19)}Repeat</span><span class="ov"><select id="f-rep" aria-label="Repeat">${reps}</select>${ic('updown',15,2.2)}</span></label>
+    <label class="opt timed-only" id="f-al1" ${showAl&&!ad?'':'hidden'}><span class="ol">${ic('bell',19)}Alert</span><span class="ov"><select id="f-a1" aria-label="Alert">${opts(a1)}</select>${ic('updown',15,2.2)}</span></label>
+    <label class="opt timed-only" id="f-al2" ${showAl&&!ad&&a1!=null?'':'hidden'}><span class="ol">${ic('bell',19)}Second Alert</span><span class="ov"><select id="f-a2" aria-label="Second alert">${opts(a2)}</select>${ic('updown',15,2.2)}</span></label>
+  </div>
+  <p class="warn" id="f-nwarn" ${!LIVE()&&NAT.notify==='denied'?'':'hidden'} style="margin:-6px 2px 14px">Notifications are off for Glassday. <button type="button" class="pill-btn" data-act="open-settings">Open Settings</button></p>`;
 }
 const WH={h:[...Array(13).keys()],m:[...Array(12)].map((_,i)=>i*5)};
 let wheelLock=false;
@@ -1327,14 +1353,10 @@ document.addEventListener('click',e=>{
       if(on){ $('f-adate').value=$('f-date').value||sel; if(!$('f-aend').value||$('f-aend').value<$('f-adate').value) $('f-aend').value=$('f-adate').value; $('f-aend').min=$('f-adate').value }
       else { $('f-date').value=$('f-adate').value||sel; if(!$('f-time').value){const s=firstFree($('f-date').value,+$('f-dur').value||30); $('f-time').value=fT(s??540)} }
       $('f-adsw').classList.toggle('on',on); $('f-days').hidden=!on; $('f-timed').hidden=on; $('f-durf').hidden=on;
+      if(NATIVE&&!(draft.ext&&!draft.editable)){ $('f-al1').hidden=on; $('f-al2').hidden=on||!draft.alerts.length }
       if(!on){ requestAnimationFrame(()=>setWheels(+$('f-dur').value||30,false)); setDur(+$('f-dur').value||30,'start') } else checkWarn();
       buzz(6); break; }
-    case 'f-rep': draft.repeat=a.dataset.v; a.parentNode.querySelectorAll('button').forEach(b=>{b.classList.toggle('on',b===a);b.setAttribute('aria-pressed',b===a)}); break;
     case 'f-dur': setDur(+a.dataset.v); buzz(5); break;
-    case 'f-alert': { const v=a.dataset.v===''?null:+a.dataset.v; draft.alert=v;
-      a.parentNode.querySelectorAll('button').forEach(b=>{b.classList.toggle('on',b===a);b.setAttribute('aria-pressed',b===a)});
-      if(v!=null&&NAT.notify!=='granted') post({type:'notify-auth'});   // ask the first time an alert is turned on
-      buzz(5); break; }
     case 'wpick': scrollWheel(a.dataset.w,+a.dataset.i,true); break;
     case 'save': { readForm(); const ti=document.getElementById('f-title');
       if(!draft.title){ti.classList.remove('shake');void ti.offsetWidth;ti.classList.add('shake');ti.focus();buzz(30);break}
@@ -1342,12 +1364,12 @@ document.addEventListener('click',e=>{
       if(!draft.date) draft.repeat='none';
       if(LIVE()&&(draft.date||draft.ext)){
         const d=draft, orig=byId(d.id); closeSheet();
-        if(d.ext&&!d.editable){ S.meta[d.series]={icon:d.icon,color:d.color,alert:d.alert}; [...S.tasks,...S.allDay].forEach(x=>{if(x.series===d.series){x.icon=d.icon;x.color=d.color}}); save(); render(); toast('Saved'); break }
+        if(d.ext&&!d.editable){ S.meta[d.series]={icon:d.icon,color:d.color}; [...S.tasks,...S.allDay].forEach(x=>{if(x.series===d.series){x.icon=d.icon;x.color=d.color}}); save(); render(); toast('Saved'); break }
         if(orig) removeTask(orig);
         if(d.date){
-          const local={id:uid(),title:d.title,icon:d.icon,color:d.color,date:d.date,start:d.start,dur:d.dur,repeat:d.repeat,notes:d.notes,location:d.location||'',alert:d.alert,done:{},calId:d.calId,allDay:!!d.allDay,endDate:d.allDay?d.endDate:null};
+          const local={id:uid(),title:d.title,icon:d.icon,color:d.color,date:d.date,start:d.start,dur:d.dur,repeat:d.repeat,notes:d.notes,location:d.location||'',alerts:d.alerts,alertsDirty:!!(d.alertsDirty||d._new),done:{},calId:d.calId,allDay:!!d.allDay,endDate:d.allDay?d.endDate:null};
           S.tasks.push(local); pushNative(local,d.ext&&orig?{series:d.series,occDate:orig.date}:{}); local.pend=true;
-          if(d.ext) S.meta[d.series]={icon:d.icon,color:d.color,alert:d.alert};
+          if(d.ext) S.meta[d.series]={icon:d.icon,color:d.color};
         }else{
           post({type:'delete',series:d.series,occDate:orig?orig.date:d.date,span:d.rep&&d.rep!=='none'?'future':'one'});
           S.tasks.push({id:uid(),title:d.title,icon:d.icon,color:d.color,date:null,start:null,dur:d.dur,repeat:'none',notes:d.notes,location:d.location||'',done:{}});
@@ -1355,7 +1377,7 @@ document.addEventListener('click',e=>{
         save(); if(d.date&&d.date!==sel&&view==='timeline'){lastDir=d.date>sel?'slide-l':'slide-r';sel=d.date;render(lastDir)} else render();
         toast(d.date?'Saved to Apple Calendar':'Moved to Inbox'); buzz([10,30,15]); break;
       }
-      const isNew=draft._new; delete draft._new; delete draft.sample;
+      const isNew=draft._new; delete draft._new; delete draft.sample; delete draft.alertsDirty;
       const o=draft.date&&!draft.allDay?overlaps(draft,draft.date):[];
       if(isNew) S.tasks.push(draft); else { const i=S.tasks.findIndex(x=>x.id===draft.id); if(i>=0) S.tasks[i]=draft }
       const d=draft; save(); closeSheet(); if(d.date&&d.date!==sel&&view==='timeline'){lastDir=d.date>sel?'slide-l':'slide-r'; sel=d.date; render(lastDir)} else render();
@@ -1427,6 +1449,16 @@ document.addEventListener('input',e=>{
 document.addEventListener('change',e=>{
   if(e.target.id==='ds'){S.settings.dayStart=+e.target.value;save();toast('Day start updated')}
   if(e.target.id==='de'){S.settings.dayEnd=+e.target.value;save();toast('Day end updated')}
+  if(e.target.id==='f-rep'&&draft){ draft.repeat=e.target.value; buzz(5) }
+  if((e.target.id==='f-a1'||e.target.id==='f-a2')&&draft){
+    const v=x=>{const el=document.getElementById(x); return el&&el.value!==''?+el.value:null};
+    let a1=v('f-a1'), a2=v('f-a2'); if(a1==null){a1=a2; a2=null}            // like Calendar: no second without a first
+    draft.alerts=[a1,a2].filter(x=>x!=null); draft.alertsDirty=true;
+    const s1=document.getElementById('f-a1'), s2=document.getElementById('f-a2');
+    s1.value=a1??''; s2.value=a2??''; document.getElementById('f-al2').hidden=a1==null;
+    if(a1!=null&&!LIVE()&&NAT.notify!=='granted') post({type:'notify-auth'});   // only Glassday-only tasks need our permission
+    buzz(5);
+  }
   if(e.target.id==='calsel'){S.settings.calId=e.target.value;save();toast('New events will go to this calendar')}
 });
 

@@ -183,7 +183,10 @@ final class CalendarBridge: NSObject, WKScriptMessageHandler {
                 "notes": e.notes ?? "",
                 "location": e.location ?? "",
                 "editable": e.calendar.allowsContentModifications,
-                "rep": repeatName(e)
+                "rep": repeatName(e),
+                // Apple Calendar alerts as minutes before the start (absolute-date alarms are left alone)
+                "alerts": (e.alarms ?? []).filter { $0.absoluteDate == nil }
+                    .map { max(0, Int((-$0.relativeOffset / 60).rounded())) }.sorted()
             ]
             item["endDate"] = key(end.addingTimeInterval(-1))
             if !e.isAllDay {
@@ -205,6 +208,8 @@ final class CalendarBridge: NSObject, WKScriptMessageHandler {
             if days == Set(2...6) { return "weekdays" }
             if days.count <= 1 { return "weekly" }
             return "custom"
+        case .weekly where rule.interval == 2 && (rule.daysOfTheWeek ?? []).count <= 1:
+            return "biweekly"
         case .monthly where rule.interval == 1 && (rule.daysOfTheWeek ?? []).isEmpty:
             return "monthly"
         case .yearly where rule.interval == 1:
@@ -277,6 +282,12 @@ final class CalendarBridge: NSObject, WKScriptMessageHandler {
         if let rep = b["repeat"] as? String, rep != "custom" {
             event.recurrenceRules = rule(for: rep).map { [$0] }
         }
+        // Alerts are real Calendar alarms, so iOS shows them (title, time, location) even when
+        // Glassday isn't running, and they match the Calendar app. Sent only when the person
+        // changed them, so alarms Glassday doesn't show (a third alert, say) are kept otherwise.
+        if let minutes = b["alerts"] as? [NSNumber] {
+            event.alarms = minutes.map { EKAlarm(relativeOffset: -TimeInterval($0.intValue * 60)) }
+        }
 
         do {
             try store.save(event, span: span, commit: true)
@@ -323,6 +334,8 @@ final class CalendarBridge: NSObject, WKScriptMessageHandler {
             return EKRecurrenceRule(recurrenceWith: .daily, interval: 1, end: nil)
         case "weekly":
             return EKRecurrenceRule(recurrenceWith: .weekly, interval: 1, end: nil)
+        case "biweekly":
+            return EKRecurrenceRule(recurrenceWith: .weekly, interval: 2, end: nil)
         case "monthly":
             return EKRecurrenceRule(recurrenceWith: .monthly, interval: 1, end: nil)
         case "yearly":

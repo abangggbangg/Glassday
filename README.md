@@ -24,7 +24,7 @@ Glassday is built as a SwiftUI shell around a hand-written HTML/CSS/JS interface
 - **Inbox**: to-dos with no time yet. Your top inbox items also appear as quick bubbles at the top of the Timeline.
 - **Overdue**: missed tasks are collected with a one-tap *Move to today*.
 - **All-day and multi-day events**: holidays, trips and deadlines sit in their own strip at the top of the Timeline, and as spanning bars at the top of Week and Month. They never overlap timed tasks. Type `Penang trip Fri to Sun` or `Hackathon 12/11 to 14/11` and Glassday makes it all-day.
-- **Repeating tasks**: every day, weekdays, every week, every month or every year. Deleting a repeat asks whether to remove **this one only**, **this and all future ones**, or **all of them**.
+- **Repeating tasks**: a Calendar-style Repeat menu with every day, every weekday, every week, every 2 weeks, every month or every year (or type `every 2 weeks`). Deleting a repeat asks whether to remove **this one only**, **this and all future ones**, or **all of them**.
 - **Overlap warnings** when you schedule over another task.
 
 ### Phone-friendly task editor
@@ -44,11 +44,10 @@ Glassday is built as a SwiftUI shell around a hand-written HTML/CSS/JS interface
 - **Insights**: planned vs free time, your longest focus window, a completion streak, and a week-load chart.
 
 ### Alerts
-- Give any timed task an **Alert**: at the start, or 5, 10, 15 or 30 minutes before. It's off unless you turn it on.
-- Add a **Location** (for example the classroom). The notification reads **`Physics class 09:00`** with the location underneath; without a location it says *Starting now* or *In 10 min*.
+- Works like Apple Calendar: **Alert** and **Second Alert** pop-up menus (None, At time of event, 5, 10, 15 or 30 minutes, 1 or 2 hours, 1 or 2 days, or 1 week before), plus a **Location** field (for example the classroom).
+- For Apple Calendar events, alerts are saved as the event's own alarms. iOS shows them (title, time and location) even if Glassday hasn't been opened, and they match the Calendar app both ways.
+- Tasks kept only in Glassday (when Calendar access is off) get Glassday's own notifications for the next 7 days: **`Physics class 09:00`** with the location underneath. Glassday asks for notification permission the first time you set one. Tapping it opens that day.
 - Type it in one go: `Physics tomorrow 9am @ Room 3.12`. Everything after `@` becomes the location.
-- Glassday asks for notification permission the first time you turn an alert on. Tapping an alert opens that day.
-- Alerts for the next 7 days are scheduled whenever you open or change Glassday, so open it at least once a week. For Apple Calendar events, the location is saved in the event and the alert choice stays in Glassday (like icons).
 
 ### Focus
 - Tap any task's icon to start a **focus timer** with a countdown ring.
@@ -151,11 +150,11 @@ Glassday/
 | `status` | | Report calendar access without prompting (`GDN.access('ask' / 'granted' / 'denied')`) |
 | `access` | | Show the system calendar prompt (only after the person taps Connect) |
 | `load` | `from`, `to` (YYYY-MM-DD) | Fetch events in a date window |
-| `upsert` | `reqId`, `series?`, `occDate?`, `title`, `date`, `start`, `dur`, `repeat`, `notes`, `location`, `calId` | Create or update an event |
+| `upsert` | `reqId`, `series?`, `occDate?`, `title`, `date`, `start`, `dur`, `repeat`, `notes`, `location`, `alerts?` (minutes before; only when changed), `calId` | Create or update an event |
 | `delete` | `series`, `occDate`, `span` (`one`/`future`) | Remove an event |
 | `settings` | | Open Glassday's page in iOS Settings (shown when access is off or add-only) |
 | `persist` | `data` (JSON string) | Save app-only state (refused above 1 MB) |
-| `alerts` | `items` [{`id`, `title`, `body`, `at` (ms), `day`}] | Replace all pending task alerts (next 7 days, max 60) |
+| `alerts` | `items` [{`id`, `title`, `body`, `at` (ms), `day`}] | Replace the pending alerts for Glassday-only tasks (next 7 days, max 60) |
 | `notify-status` / `notify-auth` | | Report / request notification permission (`GDN.notify`) |
 | `haptic` | `style` (`light`/`medium`/`success`) | Haptic feedback |
 | `awake` | `on` | Keep the screen awake during focus |
