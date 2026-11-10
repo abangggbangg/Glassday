@@ -144,8 +144,9 @@ final class WebModel: NSObject, ObservableObject, WKNavigationDelegate {
 
     /// Widget taps open glassday://day/2026-11-03
     func open(_ url: URL) {
-        guard url.scheme == "glassday", url.host == "day" else { return }
-        bridge.openDay(url.lastPathComponent)
+        // Exactly glassday://day/YYYY-MM-DD: one path component, nothing else.
+        guard url.scheme == "glassday", url.host == "day", url.pathComponents.count == 2 else { return }
+        bridge.openDay(url.pathComponents[1])
     }
 }
 

@@ -1072,7 +1072,7 @@ window.GDN={
   },
   saved(req,id,err){const p=NAT.saves[req]; delete NAT.saves[req]; if(err){toast((req==='delete'?'Couldn’t delete from':'Couldn’t save to')+' Apple Calendar: '+err);return} if(p&&id){S.meta[id]={icon:p.icon,color:p.color};save()}},
   notice(msg){ if(!this._noticed){this._noticed=true; toast(String(msg||''))} },   // once per session
-  openDay(k){if(!/^\d{4}-\d{2}-\d{2}$/.test(k))return; closeSheet(); sel=k; view='timeline'; render('fade'); setTimeout(scrollToNow,80)}
+  openDay(k){if(!/^\d{4}-\d{2}-\d{2}$/.test(k)||dk(pd(k))!==k)return; closeSheet(); sel=k; view='timeline'; render('fade'); setTimeout(scrollToNow,80)}
 };
 
 /* ---------- plan ---------- */

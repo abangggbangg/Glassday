@@ -334,7 +334,9 @@ final class CalendarBridge: NSObject, WKScriptMessageHandler {
     // MARK: misc
 
     func openDay(_ day: String) {
-        guard day.range(of: #"^\d{4}-\d{2}-\d{2}$"#, options: .regularExpression) != nil else { return }
+        // Shape check, then a real-date check: 2026-13-45 must not reach the page.
+        guard day.range(of: #"^\d{4}-\d{2}-\d{2}$"#, options: .regularExpression) != nil,
+              let d = date(day), key(d) == day else { return }
         if pageReady { run("GDN.openDay(\(json(day)))") } else { pendingDay = day }
     }
 
