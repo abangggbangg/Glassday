@@ -209,8 +209,13 @@ final class CalendarBridge: NSObject, WKScriptMessageHandler {
 
         var event: EKEvent
         var span: EKSpan = .thisEvent
-        if let series = b["series"] as? String, let occ = b["occDate"] as? String,
-           let existing = occurrence(series, on: occ) {
+        if let series = b["series"] as? String {
+            // Editing an existing event. If it can't be found (changed or deleted in Calendar
+            // since we loaded), never fall through to creating a duplicate.
+            guard let occ = b["occDate"] as? String, let existing = occurrence(series, on: occ) else {
+                scheduleReload()
+                return reply(req, nil, "It was changed or removed in Apple Calendar, so nothing was saved")
+            }
             event = existing
             if existing.hasRecurrenceRules { span = .futureEvents }
         } else {
@@ -244,20 +249,33 @@ final class CalendarBridge: NSObject, WKScriptMessageHandler {
     }
 
     /// span: "one" = this occurrence, "future" = this and later, "all" = the whole series
+    /// Failures are reported back (GDN.saved("delete", "", error)) so the page never claims a
+    /// delete that didn't happen; the reload that always follows restores the true state.
     private func delete(_ b: [String: Any]) {
-        guard hasAccess, let series = b["series"] as? String else { scheduleReload(); return }
+        defer { scheduleReload() }
+        guard hasAccess else { return reply("delete", nil, "Calendar access is off") }
+        guard let series = b["series"] as? String else { return reply("delete", nil, "Missing event") }
         let span = b["span"] as? String ?? "one"
+
+        let target: EKEvent?
+        let ekSpan: EKSpan
+        if span == "all" {
+            // For a repeating event this returns the first occurrence, so .futureEvents removes
+            // every repeat (daily, weekly, monthly and yearly rules alike).
+            target = store.calendarItem(withIdentifier: series) as? EKEvent
+            ekSpan = .futureEvents
+        } else {
+            target = (b["occDate"] as? String).flatMap { occurrence(series, on: $0) }
+            ekSpan = span == "one" ? .thisEvent : .futureEvents
+        }
+        guard let event = target else {
+            return reply("delete", nil, "It was already changed or removed in Apple Calendar")
+        }
         do {
-            if span == "all", let first = store.calendarItem(withIdentifier: series) as? EKEvent {
-                // For a repeating event this is the first occurrence, so "future" removes every repeat.
-                try store.remove(first, span: .futureEvents, commit: true)
-            } else if let occ = b["occDate"] as? String, let event = occurrence(series, on: occ) {
-                try store.remove(event, span: span == "one" ? .thisEvent : .futureEvents, commit: true)
-            }
+            try store.remove(event, span: ekSpan, commit: true)
         } catch {
             reply("delete", nil, error.localizedDescription)
         }
-        scheduleReload()
     }
 
     private func rule(for name: String) -> EKRecurrenceRule? {
