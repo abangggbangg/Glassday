@@ -75,7 +75,7 @@ Skills used:
 |---|---|---|
 | P3-1 | **Widget follows the theme (App Group)** | Needs a provisioning change. Add `com.apple.security.application-groups: [group.com.geraldangya.glassday]` to **both** targets in `project.yml` (`entitlements:` with `properties:`). In `CalendarBridge` `persist`, also write `{palette, theme}` to `UserDefaults(suiteName:)`. Read it in `WidgetBackground`/`Palette` and call `WidgetCenter.reloadAllTimelines()` when the palette changes. Sideloadly with a free account supports App Groups but rewrites the identifier, so test that path first. |
 | P3-2 | Bundle the fonts | Put the OFL `.woff2` files for Bricolage Grotesque and Manrope in `App/Resources/fonts/` and use `@font-face` with relative URLs. No bundler needed. |
-| P3-3 | Notifications before tasks | `UNUserNotificationCenter`, scheduled in `upsert`, with permission asked the first time a task gets a time (same pattern as P1-1). |
+| P3-3 | ~~Notifications before tasks~~ | **Done** (requested during the review): per-task alerts with location, see `App/Alerts.swift` and the README *Alerts* section. |
 | P3-4 | Reminders sync for the Inbox | `EKEntityType.reminder` behind a second primer. |
 | P3-5 | Interactive widget checkboxes | An App Intent `ToggleDone(series, date)`. Needs the App Group from P3-1 for tick state. |
 | P3-6 | Landscape and iPad | Portrait-only on iPhone (`TARGETED_DEVICE_FAMILY: "1"`) is the right call. The layout is a 480px column, and the week grid in landscape would leave ~6 hours visible. Revisit only with a real two-column iPad layout. |
@@ -131,3 +131,24 @@ Skills used:
 - **Listener leaks: none.** Every document-level listener is added once. Wheel listeners are attached to elements that get replaced with the sheet. `darkMQ` and `visualViewport` listeners are added once.
 - **Fonts.** See P2-10 and P3-2.
 - **Confetti.** It uses the Web Animations API on `transform` and `opacity`, so it runs on the compositor and doesn't block scrolling. The cost is the full `render()` that follows 260 ms later and replays the entrance animations (P1-5).
+
+## Fix status
+
+Everything in P0, P1 and the ★ P2 items was fixed on branch `review/hig-fixes`, one commit per finding (`fix(P0-1): …` and so on). P2-17, P2-18, P2-19 and all P3 items are written up above but not built.
+
+## Verification checklist
+
+| # | Check | Result | How |
+|---|---|---|---|
+| 1 | Cold launch, access not decided → clear prompt → Allow → timeline fills | **Pass** | Seen in Simulator: Connect card → Connect → system prompt → Allow Full Access → Japan Trip appears |
+| 2 | Access denied → clear message and a way to Settings | **Pass** | Seen: banner with *Open Settings* opens Glassday's Settings page; granting there and returning syncs |
+| 3 | `Gym tomorrow 6pm for 1h` → date, time, duration, repeat, icon | **Pass** | Run in the browser: 11 Nov, 18:00–19:00, 1h, Once, dumbbell |
+| 4 | Edit a repeating task's time → this and future change, past don't | **Pass for Calendar events / by design for local tasks** | Traced: `upsert` saves an existing recurring occurrence with `.futureEvents` (`CalendarBridge.swift` upsert). Local repeating tasks (used when Calendar access is off) change every repeat, and the editor says so. Not run against the Calendar app. |
+| 5 | Delete a repeating task → 3-way prompt; each path correct | **Pass (traced)** | The `del` handler shows This one / This and future / All. The bridge maps them to `.thisEvent` on the occurrence, `.futureEvents` on the occurrence, and `.futureEvents` on the first occurrence. Failures are now reported (P0-3). Not checked in the Calendar app. |
+| 6 | `glassday://day/2026-11-03` → opens that day | **Pass** | Seen via `simctl openurl` (iOS asks "Open in Glassday?" first). `2026-13-45` is ignored. |
+| 7 | Focus running → background → idle timer re-enabled | **Pass (traced)** | `scenePhase == .background` clears `isIdleTimerDisabled`. Back in the foreground the page re-asserts it only if the timer runs, and the countdown is correct (seen in the browser: a 2 min jump shows 12:58). |
+| 8 | Month widget renders this month; tap opens a day; Today shows next event | **Not seen (traced, builds)** | The widget wasn't added to the Simulator home screen. Day cells link to their day; title and empty areas now open today. Month shows per-day event rows, not spanning bars. |
+| 9 | Widget with access revoked → NeedAccessView, no crash | **Pass (traced)** | `CalData.items` returns `[]` when not authorized, `entry.authorized` is false, and the view shows *Tap to connect Apple Calendar*. |
+| 10 | Keyboard: title, then end time → panel above keyboard, Save reachable | **Pass (traced, partly seen)** | `GDkb` → `--kb` lifts the sheet. Its footer (Save) is pinned. Seen: the keyboard plus accessory bar doesn't shift the layout. On iOS 27 the time fields open a popover, not the keyboard; P2-15 keeps it anchored. |
+| 11 | Dark mode × 8 themes → readable text | **Pass (measured)** | Dark on-accent text is ≥ 7:1 on all 8 themes (Sunset fixed). Task glyphs and text are ≥ 3.5:1 (P2-4). |
+| 12 | VoiceOver through a timeline day | **Pass (names checked; VoiceOver not run)** | Accessible names read in the DOM: pills, gap chips ("1h free from 08:00. Add a task here"), now line ("Now, 15:03"), checks, ring, strip, tabs. |
